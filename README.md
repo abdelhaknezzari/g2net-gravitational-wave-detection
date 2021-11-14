@@ -50,7 +50,7 @@ Read file npy
       facet_grid(rows = vars(key)) +
       xlab("Time") + ylab("Intensity")
 
-![](C:\Users\I023373\OneDrive%20-%20SAP%20SE\Work%20Projects\Data%20Science%20Projects\g2net-gravitational-wave-detection\README_files/figure-markdown_strict/cars-1.png)
+![](README_files/figure-markdown_strict/cars-1.png)
 
 ## Including Plots
 
@@ -78,7 +78,7 @@ You can also embed plots, for example:
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
 
-![](C:\Users\I023373\OneDrive%20-%20SAP%20SE\Work%20Projects\Data%20Science%20Projects\g2net-gravitational-wave-detection\README_files/figure-markdown_strict/unnamed-chunk-1-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-1-1.png)
 
 similar to [example](https://rug.mnhn.fr/seewave/spec.html)
 
@@ -247,4 +247,4 @@ similar to [example](https://rug.mnhn.fr/seewave/spec.html)
     grid.newpage()
     grid.arrange(gA, gB, layout_matrix = layo)
 
-![](C:\Users\I023373\OneDrive%20-%20SAP%20SE\Work%20Projects\Data%20Science%20Projects\g2net-gravitational-wave-detection\README_files/figure-markdown_strict/unnamed-chunk-2-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-2-1.png)

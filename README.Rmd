@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Read file npy
 
-```{r cars}
+```{r gravitational waves}
 library(RcppCNPy)
 
 library(tidyverse)
