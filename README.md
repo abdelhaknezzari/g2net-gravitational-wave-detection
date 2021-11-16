@@ -2,7 +2,7 @@
 
 Nice book about sound analysis using R
 [](https://link.springer.com/book/10.1007/978-3-319-77647-7), it shows
-many examples for plotting spectrogram
+many examples for plotting spectorgrams
 
 ## R Markdown
 
@@ -78,7 +78,7 @@ Read file npy
 
     }
 
-    "00001f4945.npy" %>% readWaveFromNpy(1)  %>% spec( flim = c(0,0.05) )
+    "00001f4945.npy" %>% readWaveFromNpy(1)  %>% spec( flim = c(0,0.03) )
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
 
@@ -126,6 +126,7 @@ result we are looking is to plot some graphs.
       lab <- paste0(x, " s")
     }
 
+
     # y label formatter
     khz_formatter <- function(y){
       lab <- paste0(y, " kHz")
@@ -152,12 +153,12 @@ result we are looking is to plot some graphs.
 
                               axis.line = element_blank(),
 
-                              legend.position = "top",
-                              legend.justification = "right",
-                              legend.background = element_rect(fill="black"),
-                              legend.key.width = unit(50, "native"),
-                              legend.title = element_text(size=16, color="grey"),
-                              legend.text = element_text(size=16, color="grey"),
+                              # legend.position = "top",
+                              # legend.justification = "right",
+                              # legend.background = element_rect(fill="black"),
+                              # legend.key.width = unit(50, "native"),
+                              # legend.title = element_text(size=16, color="grey"),
+                              # legend.text = element_text(size=16, color="grey"),
 
                               plot.background = element_rect(fill="black"),
                               plot.margin = margin(1,1,0,1, "lines"),
@@ -168,7 +169,7 @@ result we are looking is to plot some graphs.
                               axis.ticks = element_line(color="grey"))
 
       wav %>%
-              ggspectro( ovlp=90, flim=c(0,0.06))+
+              ggspectro( ovlp=90, flim=c(0,0.06), wl = 2048)+
               scale_x_continuous(labels=s_formatter, expand = c(0,0))+
               scale_y_continuous(breaks = seq(from = 5, to = 20, by=5), expand = c(0,0), labels = khz_formatter, position = "right")+
               geom_raster(aes(fill=amplitude), hjust = 0, vjust = 0, interpolate = F)+
@@ -200,33 +201,66 @@ result we are looking is to plot some graphs.
     }
 
 
+    buildFFT <- function( wav ,upperFrequencyLimit = 0.06) {
+
+      oscillo_theme_dark <- theme(panel.grid.major.y = element_line(color="black", linetype = "dotted"),
+                                  panel.grid.major.x = element_blank(),
+                                  panel.grid.minor = element_blank(),
+                                  panel.background = element_rect(fill="transparent"),
+                                  panel.border = element_rect(linetype = "solid", fill = NA, color = "grey"),
+                                  axis.line = element_blank(),
+                                  legend.position = "none",
+                                  plot.background = element_rect(fill="black"),
+                                  plot.margin = unit(c(0,0,0,0), "lines"),
+                                  axis.title = element_blank(),
+                                  axis.text = element_text(size=14, color = "grey"),
+                                  axis.ticks = element_line(color="grey"))
+
+              wav %>%
+              spec(  plot = 0) %>%
+              as.data.frame() %>%
+              filter( x <= upperFrequencyLimit ) %>%
+              ggplot() +
+              geom_line(mapping = aes(x=x, y=y), color="grey")+
+              scale_x_continuous(labels=khz_formatter, expand = c(0,0))+
+              scale_y_continuous(expand = c(0,0), position = "right")+
+              geom_hline(yintercept = 0, color="white", linetype = "dotted")+
+                      coord_flip()+
+              oscillo_theme_dark
+    }
+
+
+
+
     #-------------------------------------------
     ## PLOT GRID
     #-------------------------------------------
 
-    showPlotsInGrid <- function( hotplot , oscplot ) {
+    showPlotsInGrid <- function( hotplot , oscplot , fftPlot ) {
       gA <- hotplot %>% ggplot_build() %>% ggplot_gtable()
       gB <- oscplot %>% ggplot_build() %>% ggplot_gtable()
+      gC <- fftPlot %>% ggplot_build() %>% ggplot_gtable()
 
       maxWidth = grid::unit.pmax(gA$widths, gB$widths)
 
       gA$widths <- as.list(maxWidth)
       gB$widths <- as.list(maxWidth)
 
-      layo <- rbind(c(1,1,1),
-                    c(1,1,1),
-                    c(1,1,1),
-                    c(2,2,2))
+      layo <- rbind(c(1,1,3),
+                    c(1,1,3),
+                    c(1,1,3),
+                    c(2,2,NA))
 
       grid.newpage()
-      grid.arrange(gA, gB, layout_matrix = layo)
+      grid.arrange(gA, gB,gC, layout_matrix = layo)
     }
 
 
     showPlots <- function(wav) {
-       hotplot = wav %>% buildSpectrograph()
-       oscplot = wav %>% buildDataFrameOfWave() %>% buildOscilograph()
-      showPlotsInGrid( hotplot, oscplot)
+       hotplot <- wav %>% buildSpectrograph()
+       oscplot <- wav %>% buildDataFrameOfWave() %>% buildOscilograph()
+       fftPlot <- wav %>% buildFFT()
+      showPlotsInGrid( hotplot, oscplot,fftPlot)
     }
 
     "00001f4945.npy" %>% readWaveFromNpy(2) %>% showPlots()
@@ -236,4 +270,4 @@ result we are looking is to plot some graphs.
     ## Scale for 'fill' is already present. Adding another scale for 'fill', which
     ## will replace the existing scale.
 
-![](README_files/figure-markdown_strict/unnamed-chunk-2-1.png)
+![](C:\Users\I023373\ONEDRI~1\WORKPR~1\DATASC~1\G2NET-~1\README~1/figure-markdown_strict/unnamed-chunk-2-1.png)
