@@ -270,4 +270,4 @@ result we are looking is to plot some graphs.
     ## Scale for 'fill' is already present. Adding another scale for 'fill', which
     ## will replace the existing scale.
 
-![](C:\Users\I023373\ONEDRI~1\WORKPR~1\DATASC~1\G2NET-~1\README~1/figure-markdown_strict/unnamed-chunk-2-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-2-1.png)
