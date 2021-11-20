@@ -271,3 +271,9 @@ result we are looking is to plot some graphs.
     ## will replace the existing scale.
 
 ![](README_files/figure-markdown_strict/unnamed-chunk-2-1.png)
+
+
+We implemented a shiny application located under [folder](shinyApplication) to experiment with some parameters of ggspectro function
+
+
+![](exploreData_files/figure-markdown_strict/ShinyApplication1.JPG)
