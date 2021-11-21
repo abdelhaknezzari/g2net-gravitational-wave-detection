@@ -34,7 +34,7 @@ buildDataFrameOfWave <- function(wav) {
 }
 
 
-buildSpectrograph <- function(wav,fmax = 0.06,wl = 1024) {
+buildSpectrograph <- function(wav,fmax = 0.06,wl = 2048,wn  = "hamming",ovlp = 0) {
   hot_colors <- inferno(n=20)
 
   hot_theme_grid <- theme(panel.grid.major.y = element_line(color="black", linetype = "dotted"),
@@ -61,7 +61,7 @@ buildSpectrograph <- function(wav,fmax = 0.06,wl = 1024) {
                           axis.ticks = element_line(color="grey"))
 
   wav %>%
-    ggspectro( ovlp=90, flim=c(0,fmax), wl = wl )+
+    ggspectro( flim=c(0,fmax), wl = wl, wn = wn,zp=0 , ovlp = ovlp )+
     scale_x_continuous(labels=s_formatter, expand = c(0,0))+
     scale_y_continuous(breaks = seq(from = 5, to = 20, by=5), expand = c(0,0), labels = khz_formatter, position = "right")+
     geom_raster(aes(fill=amplitude), hjust = 0, vjust = 0, interpolate = F)+
@@ -93,7 +93,7 @@ buildOscilograph <- function(df) {
 }
 
 
-buildFFT <- function( wav ,fmax = 0.06,wl = 1024) {
+buildFFT <- function( wav ,fmax = 0.06,wl = 2048,wn = "hamming") {
 
   oscillo_theme_dark <- theme(panel.grid.major.y = element_line(color="black", linetype = "dotted"),
                               panel.grid.major.x = element_blank(),
@@ -110,7 +110,7 @@ buildFFT <- function( wav ,fmax = 0.06,wl = 1024) {
 
 
   wav %>%
-    spec(  plot = 0, wl ) %>%
+    spec(  plot = 0, wl= wl,wn = wn ) %>%
     as.data.frame() %>%
     filter( x <= fmax ) %>%
     ggplot() +
@@ -149,9 +149,9 @@ showPlotsInGrid <- function( hotplot , oscplot , fftPlot ) {
 }
 
 
-showPlots <- function(wav,fmax,wl) {
-  hotplot <- wav %>% buildSpectrograph(fmax,wl)
+showPlots <- function(wav,fmax = 0.06,wl = 2048,wn = "hamming",ovlp =0 ) {
+  hotplot <- wav %>% buildSpectrograph(fmax = fmax,wl = wl,wn = wn,ovlp = ovlp)
   oscplot <- wav %>% buildDataFrameOfWave() %>% buildOscilograph()
-  fftPlot <- wav %>% buildFFT(fmax,wl)
+  fftPlot <- wav %>% buildFFT(fmax = fmax,wl = wl,wn = wn)
   showPlotsInGrid( hotplot, oscplot,fftPlot)
 }

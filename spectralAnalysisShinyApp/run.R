@@ -3,7 +3,7 @@ library(shiny)
 port <- Sys.getenv('PORT')
 
 shiny::runApp(
-  appDir = "shinyApplication",
+  appDir = "spectralAnalysisShinyApp",
   host = '0.0.0.0',
   port = 8085
 )

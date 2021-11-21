@@ -18,6 +18,15 @@ ui <- fluidPage(
                     "0c0008c89c.npy" = "0c0008c89c.npy")),
 
 
+      selectInput("wn",
+                  "Window name:",
+                  c("hanning" = "hanning",
+                    "bartlett" = "bartlett",
+                    "blackman" = "blackman",
+                    "flattop" = "flattop",
+                    "hamming" = "hamming" ,
+                    "rectangle" = "rectangle")),
+
       sliderInput(inputId = "fmax",
                   label = "Uper frequency:",
                   min = 1,
@@ -27,9 +36,15 @@ ui <- fluidPage(
 
       sliderInput(inputId = "wl",
                   label = "Frequency window length = 2^n, choose n:",
-                  min = 1,
+                  min = 7,
                   max = 15,
-                  value = 10)
+                  value = 11),
+
+      sliderInput(inputId = "ovlp",
+                  label = "Choose overlap in %",
+                  min = 0,
+                  max = 100,
+                  value = 11)
 
     ),
 
