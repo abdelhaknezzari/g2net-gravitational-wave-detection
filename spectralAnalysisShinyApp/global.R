@@ -1,1 +1,1 @@
-source("functions.R")
+source("../functions.R")

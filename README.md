@@ -1,13 +1,42 @@
-<https://www.kaggle.com/c/g2net-gravitational-wave-detection/overview>
+# Kaggle’s competition:
+
+[](https://www.kaggle.com/c/g2net-gravitational-wave-detection/overview)
+The competition is about detecting gravitational waves in three signals
+coming from three interferometre
+
+We are interested in this competition, as the waves looks like a sound,
+and we can apply some sound engineering technics, and some digital
+signal processing to extract some features from the data, before apply
+some deep learning to the models to train to predict the class of the
+wave - ‘0’: if there is no sound analysis detected - ‘1’: if there is
+one
+
+the signal consist of three waves recording in three locations: - LIGO
+Hanford, - LIGO Livingston - Virgo
+
+the challenge of this data is that it needs many disciplines including
+physics, digital signal processing, sound ingenerring and data science,
+in my previous studies when I was junger, I studied some electrical
+engeneering, it is a vey nice opportunity to remember some lessons
+learned at that time,
+
+it is kind of dream to work with such data, for a developer like me,
+where getting data at work is some times impossible due to some
+confidentiallity closes, where we can not freely to get the data to
+apply some data science algorithms
+
 we will use sound analysis to study these gravitational waves,
 
 Nice book about sound analysis using R
 [](https://link.springer.com/book/10.1007/978-3-319-77647-7), it shows
 many examples for plotting spectorgrams
 
+We group the function we build in [file](functions.R)
+
 ## R Markdown
 
-Read file npy
+Read data from the npy file, and plot them as time series with ggplot,
+every npy file contains the three waves
 
     library(RcppCNPy)
     library(tidyverse)
@@ -27,7 +56,10 @@ Read file npy
       facet_grid(rows = vars(key)) +
       xlab("Time") + ylab("Intensity")
 
-![](README_files/figure-markdown_strict/TimeAnalysis1-1.png)
+![](README_files/figure-markdown_strict/unnamed-chunk-1-1.png)
+
+we plot the spectrogram of the time series wave, and we limit the
+frequecy boundary of the plot from 0 to 0.03 khz
 
     "00001f4945.npy" %>% readWaveFromNpy(1)  %>% spec( flim = c(0,0.03) )
 
@@ -38,14 +70,6 @@ Read file npy
 ## Including Plots
 
 You can also embed plots, for example:
-
-    spectreTest <- function(fname) {
-     fname %>% npyLoad() %>% scale()-> imat
-      imat <- imat * 20
-      imat %>%  .[2,] %>% Wave( left = .,samp.rate = 2048 )  %>%
-              spectro( flim = c(0,0.2) , palette = colorRampPalette(c("white", "blue", "green")) , ovlp = 50)
-
-    }
 
     "00001f4945.npy" %>% spectreTest()
 
@@ -67,58 +91,19 @@ result we are looking is to plot some graphs.
 
 ![](README_files/figure-markdown_strict/TimeFrequency2-1.png)
 
-
-
-
 # shiny app for spectral analysis:
-can be found in [folder](spectralAnalysisShinyApp) 
+
+we use shiny applications in this project to explore visually the
+differnt parameters of the R functions and algorithms, this allows to
+find quickly the right tunning, and also understand the effect of every
+parameter, we use drop down list with different possible parameters, as
+well silders, can be found in [folder](spectralAnalysisShinyApp)
 ![](otherPictures/ShinyApplication1.JPG)
-
-
 
 # MFCC coefficients:
 
-
 Calculate Frequency conversion and Filtering: will apply some sound
 technique analysis, as frequencies domain is closer
-
-    waveAuditorySpectrumScale <- function( wave,wl = 512) {
-      # sampling frequency
-      fs <- wave@samp.rate
-      #  Power spectrum using hamming window
-       wave@left %>% powspec( sr=fs,wintime=wl/fs, steptime=wl/fs) %>%
-    #     frequency band conversion -> reduce frequencies to auditory frequency scale
-            audspec(sr=fs, minfreq=0, maxfreq=fs/2,   nfilts=26, fbtype="htkmel")
-
-    }
-
-    scaleAndPlotAudSpecToMelFrequencies <- function(wave) {
-      audspecWave <-  wave %>% waveAuditorySpectrumScale()
-      fs <- wave@samp.rate
-      # time scale
-      at <- seq(0, 1, length=5)
-      time <- round(seq(0, duration(wave), length=5), 1)
-      # Hz frequency scale
-      hz <- round(seq(fs/512, fs/2, length=5))
-      # mel frequency scale
-      mel <- hz %>%  hz2mel( htk=TRUE) %>% round()
-      # plot
-      par(mar=c(5.1, 4.1, 4.1, 4.1), las=1)
-      col <- gray((512:0)/512)
-      audspecWave$aspectrum %>% t() %>% image( col=col,
-            axes=FALSE, xlab="Time (s)", ylab="Frequency (mel)")
-      axis(side=1, at=at, labels=time)
-      axis(side=2, at=at, labels=mel)
-      axis(side=4, at=0:25/25, labels=1:26,)
-      mtext("Mel-frequency filter #", side=4, las=0, line=2.5)
-      abline(h=(0:25/25)+1/(25*2), col="lightgray")
-      abline(v=(0:73/73)+1/(73*2), col="lightgray")
-      box()
-    }
-
-    #"00001f4945.npy" %>% readWaveFromNpy(1) %>% waveAuditorySpectrumScale( ) %>% .$aspectrum  %>% image()
-    #"00001f4945.npy" %>% readWaveFromNpy(2) %>% waveAuditorySpectrumScale( ) %>% .$aspectrum  %>% image()
-    #"00001f4945.npy" %>% readWaveFromNpy(3) %>% waveAuditorySpectrumScale( ) %>% .$aspectrum  %>% image()
 
     "00001f4945.npy" %>% readWaveFromNpy(1) %>% scaleAndPlotAudSpecToMelFrequencies()
 
@@ -140,14 +125,6 @@ technique analysis, as frequencies domain is closer
 
 Cepstral Coefficients
 
-    cepstralCoefs <- function(wave) {
-      audspecWave <-  wave %>%
-        waveAuditorySpectrumScale() %>%
-        .$aspectrum %>%
-        spec2cep( ncep=13, type="t3")
-    }
-
-
     "00001f4945.npy" %>% readWaveFromNpy(1) %>% cepstralCoefs() %>% .$cep %>% image()
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
@@ -166,32 +143,6 @@ Cepstral Coefficients
 
 ![](README_files/figure-markdown_strict/Cepstral%20image-3.png)
 scale and plot
-
-    scaleAndPlotCepstralCoefs <- function(wave) {
-      cepstralCoef <-  wave %>% cepstralCoefs()
-      fs <- wave@samp.rate
-      # time scale
-      at <- seq(0, 1, length=5)
-      time <- round(seq(0, duration(wave), length=5), 1)
-      # Hz frequency scale
-      hz <- round(seq(fs/512, fs/2, length=5))
-      # mel frequency scale
-      mel <- hz %>%  hz2mel( htk=TRUE) %>% round()
-      # plot
-      par(mar=c(5.1, 4.1, 4.1, 4.1), las=1)
-      col <- gray((512:0)/512)
-      cepstralCoef$cep %>%
-        t() %>%
-        image( col=col,axes=FALSE, xlab="Time (s)", ylab="Frequency (mel)")
-      axis(side=1, at=at, labels=time)
-      axis(side=2, at=at, labels=mel)
-      axis(side=4, at=0:25/25, labels=1:26,)
-      mtext("Mel-frequency filter #", side=4, las=0, line=2.5)
-      abline(h=(0:25/25)+1/(25*2), col="lightgray")
-      abline(v=(0:73/73)+1/(73*2), col="lightgray")
-      box()
-    }
-
 
     "00001f4945.npy" %>% readWaveFromNpy(1) %>% scaleAndPlotCepstralCoefs()
 
@@ -213,21 +164,6 @@ scale and plot
 
 MFCC coeficients
 
-    mfccCoefs <- function(wave) {
-      fs <- wave@samp.rate # sampling frequency
-      wl <- 512 # STDFT window size
-      ncep <- 13 # final number of MFCCs
-      wave %>%
-        preemphasis( alpha=0.97, output="Wave") %>%
-        .@left %>%
-        powspec( sr=fs, wintime=wl/fs, steptime=wl/fs) %>%
-        audspec( sr=fs, nfilts=ncep*2, fbtype="htkmel") %>%
-        .$aspectrum %>%
-        spec2cep( ncep=ncep, type="t3") %>%
-        .$cep %>%
-        lifter( lift=ncep-1, htk=TRUE)
-    }
-
     "00001f4945.npy" %>% readWaveFromNpy(1) %>% mfccCoefs() %>% image()
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
@@ -248,60 +184,26 @@ MFCC coeficients
 
 use melfcc function from tuneR package to calculate the coeficients
 
-    mfccCoefs2 <- function(wave) {
-      wl <- 512
-      ncep <- 13
-      fs <- wave@samp.rate # sampling frequency
-      wave %>%  melfcc( sr=fs,
-                           wintime=wl/fs, hoptime=wl/fs,
-                           numcep=ncep, nbands=ncep*2,
-                           fbtype="htkmel", dcttype="t3",
-                           htklifter=TRUE, lifterexp=ncep-1,
-                           frames_in_rows=FALSE,
-                           spec_out=TRUE)
-    }
-
-
     "00001f4945.npy" %>% readWaveFromNpy(1) %>% mfccCoefs2() %>% .$cepstra %>% image()
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
 
-![](README_files/figure-markdown_strict/iamge%20mfcc-1.png)
+![](README_files/figure-markdown_strict/iamgesMfcc-1.png)
 
     "00001f4945.npy" %>% readWaveFromNpy(2) %>% mfccCoefs2() %>% .$cepstra %>% image()
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
 
-![](README_files/figure-markdown_strict/iamge%20mfcc-2.png)
+![](README_files/figure-markdown_strict/iamgesMfcc-2.png)
 
     "00001f4945.npy" %>% readWaveFromNpy(3) %>% mfccCoefs2() %>% .$cepstra %>% image()
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
 
-![](README_files/figure-markdown_strict/iamge%20mfcc-3.png)
+![](README_files/figure-markdown_strict/iamgesMfcc-3.png)
 
 Scale MFCC 13 coefficients and time to original and plot values in gery
 scale:
-
-    scalePlotMfcc <- function(wave) {
-      ## time scale
-      at <- seq(0, 1, length=5)
-      time <- wave %>% duration() %>% seq(0, ., length=5) %>% round(1)
-      ## plot
-      # grey scale of colors
-      col <- ((512:0)/512) %>% gray()
-      par(las=1)
-      wave %>%
-        mfccCoefs2() %>%
-        .$cepstra %>%
-        t() %>%
-        image(col=col,axes=FALSE, xlab="Time (s)", ylab="MFCC #")
-      axis(side=1, at=at, labels=time)
-      axis(side=2, at=0:12/12, labels=1:13)
-      abline(h=(0:12/12)+1/(12*2), col="lightgray")
-      abline(v=(0:73/73)+1/(73*2), col="lightgray")
-      box()
-    }
 
     "00001f4945.npy" %>% readWaveFromNpy(1) %>% scalePlotMfcc()
 
@@ -323,28 +225,111 @@ scale:
 
 Use ggplot for the graphs ‘geom\_raster’
 
-    ggplotMFCC <- function(wave) {
-      signalDuration <- wave %>% duration()
-      wave %>%
-      mfccCoefs2() %>%
-              .$cepstra %>%
-              reshape2::melt() %>%
-              mutate( Var2 = signalDuration * (Var2/max(Var2))  ) %>%
-              ggplot( aes(x = Var2, y = Var1)) +
-              geom_raster(aes(fill=value)) +
-              scale_fill_gradientn(colours = ((512:0)/512) %>% gray()  ) +
-              scale_x_continuous(n.breaks = 10) +
-              scale_y_continuous(n.breaks=13) +
-              labs(x="Time (s)", y="Coeficuents", title="MFCC coeficients") +
-              theme_bw() +
-              theme(axis.text.x=element_text(size=9, angle=0, vjust=0.3),
-                    axis.text.y=element_text(size=9),
-                    plot.title=element_text(size=11))
-    }
-
-
     "00001f4945.npy" %>% readWaveFromNpy(1)   %>% ggplotMFCC()
 
     ## Warning in .local(left, ...): 'bit' not specified, assuming 16bit
 
 ![](README_files/figure-markdown_strict/ggplotMFCC-1.png)
+
+Generate csv file with name of .npy files, with their paths and category
+type (1 : wave detected, 0: wave not detected )
+
+    "../machineLearningData/gravitationalWaves/train" %>%
+            list.files( recursive = T,full.names = T, include.dirs = F) %>%
+            as_tibble() %>%
+            mutate( id = value %>% str_sub(55) ) %>%
+            rename(filePath = value) %>%
+            inner_join(
+                    "../machineLearningData/gravitationalWaves/train/ing_labels.csv" %>%
+                            read.csv() %>%
+                            as_tibble() %>%
+                            mutate(id = paste0(id, ".npy") )
+            ) %>%
+            write.csv( file = "../machineLearningData/gravitationalWaves/train/file_labels.csv")
+
+Produce animation of images of time frequency graphs using sample of
+gravitational waves are detected, we will try with animation to detect
+or see any feature from the data visual, the first sequence of MFCC
+coefficients will be with only class data ‘1’, then class ‘0’ and
+finally we produce a sequence switching between class 1 and class 0, so
+to detect any difference visually as said.
+
+Sequence of 20 images of class 1, we store them in
+[folder](otherPictures/coefficientsClass1):
+
+[](https://www.nagraj.net/notes/gifs-in-r/)
+
+We produce the animation for the 20 images:
+
+    "otherPictures/coefficientsClass1" %>% animateMFCCCoefPlots(waveClass = 1)
+
+We can show the produced animation
+![](otherPictures/animations/animationCoeficientsClass1.gif)
+
+we produce also images of coefficients of class 0, and we store them in
+[folder](otherPictures/coefficientsClass0):
+
+we produce animation with 5 of produced images:
+
+    "otherPictures/coefficientsClass0" %>% animateMFCCCoefPlots(waveClass = 0)
+
+We can show the produced animation
+![](otherPictures/animations/animationCoeficientsClass1.gif)
+
+let’s produce animation with mix of coefficients pictures for class: ‘1’
+and ‘0’
+
+     "otherPictures/coefficientsClass0" %>%
+      list.files(full.names = TRUE) %>%
+      .[1:3] %>%
+      rbind( "otherPictures/coefficientsClass1" %>% list.files(full.names = TRUE) %>% .[1:3] ) %>%
+      c(.) %>%
+      savePicturesAsAnimation( waveClass = 10 )
+
+the animation of two classes 1 and 0 ( we used 3 images of each class)
+![](otherPictures/animations/animationCoeficientsClass10.gif)
+
+# shiny application for MFCC coefficients:
+
+to understand the different parterres of MFCC calculation, we build
+another small shinny application: - the user can change the parameters
+to see a better visualization - to find suitable values, of the
+algorithm that we can use later the application is located at
+[folder](mfccAnalysisShinyApp) it can run with file ‘run.R’
+
+this is a screenshot of the application, to see how it looks like:
+![](otherPictures/ShinyApplicatio2.JPG)
+
+# Reduce dimensions of MFCC matrix for better visualization
+
+Visually it is hard to see the difference between the waves containing
+gravitation and the others, even with the animations techniques, it is
+still undistinguished,
+
+let’s do more: - we calculate the MFCC coefficients with suitable
+parameters found with shiny application - repeat the above step for many
+waves - reduce the dimension of the MFCC matrices using PCA - plot the
+scatter plot that show in two different colors the two classes of data
+this will be a good indicator whether MFCC features can be used to train
+models
+
+    calCulateMFCCMatrix <- function(wave) {
+
+    }
+
+    plot3DMFCCOneWave <- function(wave){
+      options(rgl.useNULL = TRUE) # Suppress the separate window.
+      library(rgl)
+      rgl::setupKnitr(autoprint = TRUE)
+      x <- sort(rnorm(1000))
+      y <- rnorm(1000)
+      z <- rnorm(1000) + atan2(x,y)
+      plot3d(x, y, z, col = rainbow(1000))
+      rglwidget()
+    }
+
+    plot3DMFCCOneWave()
+
+    ## Warning: package 'rgl' was built under R version 3.6.3
+
+![](README_files/figure-markdown_strict/unnamed-chunk-2-1.png)
