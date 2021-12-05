@@ -16,10 +16,10 @@ the signal consist of three waves recording in three locations:
 - LIGO Livingston
 - Virgo
 
-the challenge of this data is that it needs many disciplines including physics, digital signal processing, sound ingenerring and data science, in my previous studies when I was junger, I studied some electrical engeneering, it is a vey nice opportunity to remember some lessons learned at that time,
+the challenge of this data is that it needs many disciplines including physics, digital signal processing, sound engineering and data science, in my previous studies when I was junger, I studied some electrical engeneering, it is a vey nice opportunity to remember some lessons learned at that time,
 
 
-it is kind of dream to work with such data, for a developer like me, where getting data at work is some times impossible due to some confidentiallity closes, where we can not freely to get the data to apply some data science algorithms
+it is kind of dream to work with such data, for a developer like me, where getting data at work is some times impossible due to some confidentiality closes, where we can not freely to get the data to apply some data science algorithms
 
 we will use sound analysis to study these gravitational waves,
 
@@ -289,27 +289,198 @@ this will be a good indicator whether MFCC features can be used to train models
 
 
 
+We take randomly a given number of waves for example 100 from both classes of the data, we do the following transformations for the data:
+- Read the wave data
+- Calculate MFCC matrix of dimension 19 x 64 ( number of coefficients is 19, window length is 64 for the signal)
+- we convert the every matrix of signals to one vector of 1216
+- perform principal component analysis for both samples of data, matrix of ( 200 x 1216 )
+- take the two most significant vectors of resulted PCA
+- plot a scatter plot with different colors for the data classes
+
 
 
 
 ```{r }
 
 
-calCulateMFCCMatrix <- function(wave) {
+```
+
+
+
+```{r }
+getSamleOfMixClasses(1000 , 1 )%>% ggplot( aes( x = PC1, y = PC2 ) ) + geom_point( aes( colour = target)  )
+
+```
+
+
+```{r }
+getSamleOfMixClasses(1000 , 2 )%>% ggplot( aes( x = PC1, y = PC2 ) ) + geom_point( aes( colour = target)  )
+
+```
+
+
+```{r }
+getSamleOfMixClasses(1000 , 3 )%>% ggplot( aes( x = PC1, y = PC2 ) ) + geom_point( aes( colour = target)  )
+
+```
+
+
+
+
+for better visualization we tsne instead of PCA
+
+```{r }
+
+
+
+getSamleOfMixClassesTsne( 1000 , 1 , maxDim = 2 ) %>% ggplot( aes( x = V1, y = V2 ) ) + geom_point( aes( colour = target)  )
+
+```
+
+
+
+```{r }
+getSamleOfMixClassesTsne( 1000 , 2 , maxDim = 2 ) %>% ggplot( aes( x = V1, y = V2 ) ) + geom_point( aes( colour = target)  )
+
+```
+
+
+
+```{r }
+getSamleOfMixClassesTsne( 1000 , 3 , maxDim = 2 ) %>% ggplot( aes( x = V1, y = V2 ) ) + geom_point( aes( colour = target)  )
+
+```
+
+
+3D plot
+
+```{r }
+
+getSamleOfMixClassesTsne( 1000 , 1, maxDim = 3 ) %>% scatterPlot3DDimReduction()
+
+
+
+```
+
+
+```{r }
+
+getSamleOfMixClassesTsne( 1000 , 2, maxDim = 3 ) %>% scatterPlot3DDimReduction()
+
+
+
+```
+
+```{r }
+
+getSamleOfMixClassesTsne( 1000 , 3, maxDim = 3 ) %>% scatterPlot3DDimReduction()
+
+
+
+```
+
+
+In the above 3d graphs we were checking if we visually we can see any clusters, or any way to separate the red and white points,
+it looks not easy at 3D dimension,
+we will now apply some neural network model, to predict the class of the wave, we can use to train the models and validate them:
+- Directly the 'melfcc' matrices
+- Reduced dimensions using of Tsne transformation
+
+
+
+
+# Machine learning
+
+## Deep learning with keras
+
+
+we check keras installation
+
+we have 3 waves, and every wave needs 19 x 64 matrix, and we have a total 560000 rows
+
+19 x 64 x 3 will be the input format of neural network,
+
+we build a function that can convert any set of waves to the input of our neural network,
+it takes as paramters the number of waves that we want to convert, then it will take a samples of that number of waves randomly
+it transform every wave to a matrix of 19 x 64
+
+```{r }
+
+convertToNeuralInputShape <- function( numberSamples) {
+
+  "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves() %>%
+    sample_n( size = numberSamples ) %>%
+    select(-X) %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character() %>%
+    lapply(
+      function(path) {
+        wave1 <- path %>%
+          readWaveFromNpy(1)  %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" )
+        wave2 <- path %>%
+          readWaveFromNpy(2) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" )
+        wave3 <- path %>%
+          readWaveFromNpy(3) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" )
+
+        cbind(wave1,wave2,wave3) %>% array(c(19,64,3))
+
+      } ) %>%
+    array(c(numberSamples,19,64,3))
 
 }
 
-plot3DMFCCOneWave <- function(wave){
-  options(rgl.useNULL = TRUE) # Suppress the separate window.
-  library(rgl)
-  rgl::setupKnitr(autoprint = TRUE)
-  x <- sort(rnorm(1000))
-  y <- rnorm(1000)
-  z <- rnorm(1000) + atan2(x,y)
-  plot3d(x, y, z, col = rainbow(1000))
-  rglwidget()
-}
+```
 
-plot3DMFCCOneWave()
+
+let's measure the size of resulted matrix for every wave:
+
+```{r }
+convertToNeuralInputShape(1)%>% utils::object.size( ) %>% format('Mb')
+
+```
+
+so, 560 000 waves will need: 6 x 10^13 bytes ->  60 TeraBytes, this is very high to hold in memory and train the neural network,
+
+to solve the problem we will need a kind of data streaming, to read not all the data, but smaller amounts and loop on them util we finish the learning
+
+Keras hopefully has such way of learning by loading smaller chuncks of training data 'keras::fit_generator'
+
+[python example](https://gist.github.com/fchollet/0830affa1f7f19fd47b06d4cf89ed44d)
+Good explanation for [r example](https://keras.rstudio.com/articles/faq.html#how-can-i-use-keras-with-datasets-that-dont-fit-in-memory)
+[r example](https://stackoverflow.com/questions/53357901/using-a-custom-r-generator-function-with-fit-generator-keras-r)
+
+
+To start the neural network model, we will copy [start_example](https://github.com/rstudio/keras/blob/master/vignettes/examples/cifar10_cnn.R)
+we change its input to adapt it to the output of our function calculating MELFCC function 19x63 or 19x63x3 depending on of we use the 3 signals, or only one
+the output of the network will be 1 dense layer finishing with softmax activation,
+
+two ways to model that we can see for the moment:
+- use three independent models, every one will be trained by one wave, at the end we bring them together using ensemble
+- use one model, that we train by the three signals of the three stations
+
+
+
+
+```{r }
+
+modelWave1 <- trainWith1Wave( waveIndex = 1)
+modelWave2 <- trainWith1Wave( waveIndex = 2)
+modelWave3 <- trainWith1Wave( waveIndex = 3)
+
+
+```
+
+
+```{r }
+
+
+
+
+
 
 ```

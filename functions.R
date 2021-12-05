@@ -6,13 +6,18 @@ library(ggplot2)
 library(viridis)
 library(grid)
 library(gridExtra)
+library(scatterplot3d)
+library(Rtsne)
+library(keras)
+
+
 
 readWaveFromNpy <- function(filePath,index) {
   filePath %>%
     npyLoad() %>%
     .[index,] %>%
     scale()  %>%
-    Wave( left = .,samp.rate = 2048 )
+    Wave( left = .,samp.rate = 2048 , bit = 32 )
 }
 
 # x label formatter
@@ -165,10 +170,6 @@ spectreTest <- function(fname) {
 
 }
 
-
-
-
-
 waveAuditorySpectrumScale <- function( wave,wl = 512) {
   # sampling frequency
   fs <- wave@samp.rate
@@ -203,18 +204,12 @@ scaleAndPlotAudSpecToMelFrequencies <- function(wave) {
   box()
 }
 
-
-
-
-
 cepstralCoefs <- function(wave) {
   audspecWave <-  wave %>%
     waveAuditorySpectrumScale() %>%
     .$aspectrum %>%
     spec2cep( ncep=13, type="t3")
 }
-
-
 
 scaleAndPlotCepstralCoefs <- function(wave) {
   cepstralCoef <-  wave %>% cepstralCoefs()
@@ -406,3 +401,374 @@ animateMFCCCoefPlots <- function(imagesPath, waveClass = 1) {
     .[15:20] %>%
     savePicturesAsAnimation(waveClass)
 }
+
+calCulateMFCCMatrix <- function(wave ,ncep = 13,wl = 512, fbtype="htkmel" , dcttype="t3") {
+  wave %>%
+    mfccCoefs2(ncep,wl, fbtype, dcttype) %>%
+    .$cepstra
+}
+
+getSamleOf <- function(nrSamples = 10, target = 1) {
+  "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves() %>%
+    filter( target ==  target ) %>%
+    sample_n( size = nrSamples ) %>%
+    select(-X) %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character() %>%
+    lapply(
+      function(path) {
+        vec <- path %>% readWaveFromNpy(1) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+          as.vector()
+        vec %>% set_names( seq(vec %>% length() ) )
+
+
+      } ) %>%
+    bind_rows() %>%
+    prcomp( scale. = T) %>%
+    .$x %>%
+    .[,1:2]%>% as.tibble() %>% add_column(target = target)
+
+
+}
+
+getSamleOfMixClasses <- function(nrSamples = 10, waveIndex = 1, maxDim = 2 ) {
+  wavesClass1 <-   "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves() %>%
+    filter( target ==  1 ) %>%
+    sample_n( size = nrSamples ) %>%
+    select(-X) %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character() %>%
+    lapply(
+      function(path,waveIndex) {
+        vec <- path %>% readWaveFromNpy(waveIndex) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+          as.vector()
+        vec %>% set_names( seq(vec %>% length() ) )
+
+
+      },waveIndex ) %>%
+    bind_rows()
+
+  wavesClass0 <-   "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves() %>%
+    filter( target ==  0 ) %>%
+    sample_n( size = nrSamples ) %>%
+    select(-X) %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character() %>%
+    lapply(
+      function(path, waveIndex ) {
+        vec <- path %>% readWaveFromNpy(waveIndex ) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+          as.vector()
+        vec %>% set_names( seq(vec %>% length() ) )
+
+
+      }, waveIndex ) %>%
+    bind_rows()
+
+  wavesClass0 %>%
+    rbind(wavesClass1) %>%
+    prcomp( scale. = T) %>%
+    .$x %>%
+    .[,1:maxDim] %>%
+    as.tibble() %>%
+    mutate( target = ifelse( row_number() <= nrSamples , 0  , 1  ) %>% as.factor() )
+
+
+
+}
+
+
+getSamleOfMixClassesTsne <- function(nrSamples = 10, waveIndex = 1, maxDim = 2 ) {
+  wavesClass1 <-   "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves() %>%
+    filter( target ==  1 ) %>%
+    sample_n( size = nrSamples ) %>%
+    select(-X) %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character() %>%
+    lapply(
+      function(path,waveIndex) {
+        vec <- path %>% readWaveFromNpy(waveIndex) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+          as.vector()
+        vec %>% set_names( seq(vec %>% length() ) )
+
+
+      },waveIndex ) %>%
+    bind_rows()
+
+  wavesClass0 <-   "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves() %>%
+    filter( target ==  0 ) %>%
+    sample_n( size = nrSamples ) %>%
+    select(-X) %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character() %>%
+    lapply(
+      function(path, waveIndex ) {
+        vec <- path %>% readWaveFromNpy(waveIndex ) %>%
+          calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+          as.vector()
+        vec %>% set_names( seq(vec %>% length() ) )
+      }, waveIndex ) %>%
+    bind_rows()
+
+  wavesClass0 %>%
+    rbind(wavesClass1) %>%
+    scale() %>%
+    Rtsne( dims = maxDim) %>%
+    .$Y %>%
+    as.tibble() %>%
+    mutate( target = ifelse( row_number() <= nrSamples , 0  , 1  ) %>% as.factor() )
+
+}
+
+scatterPlot3DDimReduction <- function(data3D) {
+  scatterplot3d(x =data3D$V1, y = data3D$V2, z = data3D$V3, color = as.numeric(data3D$target),pch=20,angle=45 ,
+                xlab = 'Tsne Dimention x', ylab = 'Tsne Dimention y' , zlab = 'Tsne Dimention z')
+}
+
+
+
+
+readFiles <- function() {
+  "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves()  %>%
+    select(filePath) %>%
+    unlist() %>%
+    as.character()
+}
+
+
+readLabels <- function() {
+  "../machineLearningData/gravitationalWaves/train/file_labels.csv" %>%
+    getListOfWaves()  %>%
+    select(target) %>%
+    unlist()
+}
+
+dataGeneratorFromFiles3Waves <- function(files, labels,batchSize = 10 ) {
+  fileIndex <- 0
+
+  function() {
+    if (fileIndex > length(files))
+      fileIndex <<- 0
+
+    nextIndex    <- fileIndex + batchSize
+    rangeIndexes <- (fileIndex+1): nextIndex
+
+    labelsToprocess <- labels[rangeIndexes ] %>% as.numeric()
+
+    dataToProcess   <- files[ rangeIndexes ] %>%
+      lapply(
+        function(path) {
+          wave1 <- path %>%
+            readWaveFromNpy(1)  %>%
+            calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+            keras::normalize(axis = -1, order = 2)
+          wave2 <- path %>%
+            readWaveFromNpy(2) %>%
+            calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+            keras::normalize(axis = -1, order = 2)
+          wave3 <- path %>%
+            readWaveFromNpy(3) %>%
+            calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+            keras::normalize(axis = -1, order = 2)
+          list( wave1,wave2,wave3) %>% array_reshape( c(19,63,3) )
+        } ) %>%
+      array_reshape(c(batchSize,19,63,3))
+    fileIndex <<- nextIndex
+    list(dataToProcess, labelsToprocess )
+  }
+}
+
+
+
+dataGeneratorFromFiles1Wave <- function(files, labels,batchSize = 10, waveIndex = 1 ) {
+  fileIndex <- 0
+
+  function() {
+    if (fileIndex > length(files)) {
+      fileIndex <<- 0
+    }
+
+    nextIndex = fileIndex + batchSize
+    rangeIndexes <- (fileIndex+1): nextIndex
+    labelsToprocess <- labels[ rangeIndexes ] %>% as.numeric()
+    dataToProcess   <- files[ rangeIndexes ] %>%
+      lapply(
+        function(path) {
+
+          wave <- path %>%
+            readWaveFromNpy(waveIndex)  %>%
+            calCulateMFCCMatrix( ncep = 19,wl = 64, fbtype="htkmel" , dcttype="t3" ) %>%
+            keras::normalize(axis = -1, order = 2)
+          wave %>% array_reshape( c(19,63) )
+        } ) %>%
+      array_reshape(c(batchSize,19,63))
+    fileIndex <<- nextIndex
+    list(dataToProcess, labelsToprocess )
+  }
+}
+
+
+
+
+
+buildKerasModel3Waves <- function() {
+  # Initialize sequential model
+  model <- keras_model_sequential()
+
+  model %>%
+
+    # Start with hidden 2D convolutional layer being fed 32x32 pixel images
+    layer_conv_2d(
+      filter = 32, kernel_size = c(3,3), padding = "same",
+      input_shape = c(19, 63, 3)
+    ) %>%
+    layer_activation("relu") %>%
+
+    # Second hidden layer
+    layer_conv_2d(filter = 32, kernel_size = c(3,3)) %>%
+    layer_activation("relu") %>%
+
+    # Use max pooling
+    layer_max_pooling_2d(pool_size = c(2,2)) %>%
+    layer_dropout(0.25) %>%
+
+    # 2 additional hidden 2D convolutional layers
+    layer_conv_2d(filter = 32, kernel_size = c(3,3), padding = "same") %>%
+    layer_activation("relu") %>%
+    layer_conv_2d(filter = 32, kernel_size = c(3,3)) %>%
+    layer_activation("relu") %>%
+
+    # Use max pooling once more
+    layer_max_pooling_2d(pool_size = c(2,2)) %>%
+    layer_dropout(0.25) %>%
+
+    # Flatten max filtered output into feature vector
+    # and feed into dense layer
+    layer_flatten() %>%
+    layer_dense(512) %>%
+    layer_activation("relu") %>%
+    layer_dropout(0.5) %>%
+
+    # Outputs from dense layer are projected onto 10 unit output layer
+    layer_dense(1 ) %>%
+    layer_activation("softmax")
+
+  opt <- optimizer_rmsprop(lr = 0.0001, decay = 1e-6)
+
+  model %>% compile(
+    loss = "categorical_crossentropy",
+    optimizer = opt,
+    metrics = "accuracy"
+  )
+
+  model %>% return()
+
+}
+
+
+buildKerasModel1Wave <- function() {
+  # Initialize sequential model
+  model <- keras_model_sequential()
+
+  model %>%
+
+    # Start with hidden 2D convolutional layer being fed 32x32 pixel images
+    layer_conv_1d(
+      filter = 32, kernel_size = 3, padding = "same",
+      input_shape = c(19, 63)
+    ) %>%
+    layer_activation("relu") %>%
+
+    # Second hidden layer
+    layer_conv_1d(filter = 32, kernel_size = 3 ) %>%
+    layer_activation("relu") %>%
+
+    # Use max pooling
+    layer_max_pooling_1d(pool_size = 2 ) %>%
+    layer_dropout(0.25) %>%
+
+    # 2 additional hidden 2D convolutional layers
+    layer_conv_1d(filter = 32, kernel_size = 3, padding = "same") %>%
+    layer_activation("relu") %>%
+    layer_conv_1d(filter = 32, kernel_size = 3 ) %>%
+    layer_activation("relu") %>%
+
+    # Use max pooling once more
+    layer_max_pooling_1d(pool_size = 2  ) %>%
+    layer_dropout(0.25) %>%
+
+    # Flatten max filtered output into feature vector
+    # and feed into dense layer
+    layer_flatten() %>%
+    layer_dense(512) %>%
+    layer_activation("relu") %>%
+    layer_dropout(0.5) %>%
+
+    # Outputs from dense layer are projected onto 10 unit output layer
+    layer_dense(1 ) %>%
+    layer_activation("softmax")
+
+  opt <- optimizer_rmsprop(lr = 0.0001, decay = 1e-6)
+
+#  model %>% compile( loss = "categorical_crossentropy",   optimizer = opt,   metrics = "accuracy"   )
+  model %>% compile(
+    optimizer = "rmsprop",
+    loss = "categorical_crossentropy",
+    metrics = c("accuracy")
+  )
+
+  model %>% return()
+
+}
+
+
+
+trainWith3Waves <- function(){
+
+  labels <- readLabels()
+  files <- readFiles()
+
+  gen <- keras:::as_generator.function(dataGeneratorFromFiles3Waves(files, labels, batchSize = 10))
+
+  model <- buildKerasModel3Waves()
+  model %>%
+    fit_generator(gen,
+                  steps_per_epoch = ( files %>% length()) / 10, epochs = 200)
+  model
+
+}
+
+
+
+trainWith1Wave <- function(waveIndex = 1){
+
+  labels <- readLabels()
+  files <- readFiles()
+
+  gen <- keras:::as_generator.function(dataGeneratorFromFiles1Wave(files, labels, batchSize = 10, waveIndex = 1))
+
+  model <- buildKerasModel1Wave()
+  model %>%
+    fit_generator( gen,
+                  steps_per_epoch = 56000, epochs = 200)
+  model
+
+}
+
+
+
+
