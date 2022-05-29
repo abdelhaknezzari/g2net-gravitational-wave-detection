@@ -1,104 +1,157 @@
-library(keras)
-
-# Parameters --------------------------------------------------------------
-
-batch_size <- 32
-epochs <- 200
-data_augmentation <- TRUE
-
-
-# Data Preparation --------------------------------------------------------
-
-# See ?dataset_cifar10 for more info
-cifar10 <- dataset_cifar10()
-
-# Feature scale RGB values in test and train inputs
-x_train <- cifar10$train$x/255
-x_test <- cifar10$test$x/255
-y_train <- to_categorical(cifar10$train$y, num_classes = 10)
-y_test <- to_categorical(cifar10$test$y, num_classes = 10)
-
-
-# Defining Model ----------------------------------------------------------
-
-# Initialize sequential model
-model <- keras_model_sequential()
-
-model %>%
-
-  # Start with hidden 2D convolutional layer being fed 32x32 pixel images
-  layer_conv_2d(
-    filter = 32, kernel_size = c(3,3), padding = "same",
-    input_shape = c(32, 32, 3)
-  ) %>%
-  layer_activation("relu") %>%
-
-  # Second hidden layer
-  layer_conv_2d(filter = 32, kernel_size = c(3,3)) %>%
-  layer_activation("relu") %>%
-
-  # Use max pooling
-  layer_max_pooling_2d(pool_size = c(2,2)) %>%
-  layer_dropout(0.25) %>%
-
-  # 2 additional hidden 2D convolutional layers
-  layer_conv_2d(filter = 32, kernel_size = c(3,3), padding = "same") %>%
-  layer_activation("relu") %>%
-  layer_conv_2d(filter = 32, kernel_size = c(3,3)) %>%
-  layer_activation("relu") %>%
-
-  # Use max pooling once more
-  layer_max_pooling_2d(pool_size = c(2,2)) %>%
-  layer_dropout(0.25) %>%
-
-  # Flatten max filtered output into feature vector
-  # and feed into dense layer
-  layer_flatten() %>%
-  layer_dense(512) %>%
-  layer_activation("relu") %>%
+ keras_model_sequential() %>%
+  layer_lstm(units = 63, return_sequences = TRUE, input_shape = c(19,32)) %>%
+  layer_lstm(units = 32, return_sequences = TRUE) %>%
+  layer_lstm(units = 32) %>% # return a single vector dimension 32
+  layer_dense(units = 100) %>%
   layer_dropout(0.5) %>%
-
-  # Outputs from dense layer are projected onto 10 unit output layer
-  layer_dense(10) %>%
-  layer_activation("softmax")
-
-opt <- optimizer_rmsprop(lr = 0.0001, decay = 1e-6)
-
-model %>% compile(
-  loss = "categorical_crossentropy",
-  optimizer = opt,
-  metrics = "accuracy"
-)
+  layer_dense(1 ) %>%
+  layer_activation("softmax") %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = 'rmsprop',
+    metrics = c('accuracy')
+  ) %>% print()
 
 
-# Training ----------------------------------------------------------------
 
-if(!data_augmentation){
+keras_model_sequential() %>%
+  layer_lstm(units = 3,
+             input_shape = c(63, 3000),
+             batch_size = 19,
+             return_sequences = TRUE,
+             stateful = TRUE) %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_lstm(units = 50,
+             return_sequences = FALSE,
+             stateful = TRUE) %>%
+  layer_dropout(rate = 0.5) %>%
+  layer_dense(units = 1) %>%
+  compile(loss = 'mae', optimizer = 'adam') %>%
+  print()
 
-  model %>% fit(
-    x_train, y_train,
-    batch_size = batch_size,
-    epochs = epochs,
-    validation_data = list(x_test, y_test),
-    shuffle = TRUE
-  )
 
-} else {
 
-  datagen <- image_data_generator(
-    rotation_range = 20,
-    width_shift_range = 0.2,
-    height_shift_range = 0.2,
-    horizontal_flip = TRUE
-  )
 
-  datagen %>% fit_image_data_generator(x_train)
+ keras_model_sequential() %>%
 
-  model %>% fit_generator(
-    flow_images_from_data(x_train, y_train, datagen, batch_size = batch_size),
-    steps_per_epoch = as.integer(50000/batch_size),
-    epochs = epochs,
-    validation_data = list(x_test, y_test)
-  )
+   # Begin with 2D convolutional LSTM layer
+   layer_conv_lstm_2d(
+     input_shape = list(NULL,19,63,1),
+     filters = 32, kernel_size = c(3,3),
+     padding = "same",
+     data_format="channels_last",
+     return_sequences = TRUE
+   ) %>%
+   # Normalize the activations of the previous layer
+   layer_batch_normalization() %>%
 
-}
+   # Add 3x hidden 2D convolutions LSTM layers, with
+   # batch normalization layers between
+   layer_conv_lstm_2d(
+     filters = 40, kernel_size = c(3,3),
+     padding = "same", return_sequences = TRUE
+   ) %>%
+   layer_batch_normalization() %>%
+   layer_conv_lstm_2d(
+     filters = 40, kernel_size = c(3,3),
+     padding = "same", return_sequences = TRUE
+   ) %>%
+   layer_batch_normalization() %>%
+   layer_conv_lstm_2d(
+     filters = 40, kernel_size = c(3,3),
+     padding = "same", return_sequences = TRUE
+   ) %>%
+   layer_batch_normalization() %>%
+
+   # Add final 3D convolutional output layer
+   layer_conv_3d(
+     filters = 1, kernel_size = c(3,3,3),
+     activation = "sigmoid",
+     padding = "same", data_format ="channels_last"
+   ) %>%
+compile(
+   loss = "binary_crossentropy",
+   optimizer = "adadelta"
+ ) %>% print()
+
+
+
+ whitenWave <- function( wavePath, index) {
+   sig1 =  wavePath %>% npyLoad() %>% .[index,]
+
+   length1 = sig1 %>% length()
+
+   spec1 = fft(sig1 *  hanning.w(length1 ) )
+
+   mag1 = spec1 %>% Mod()
+
+   (spec1 /mag1 ) %>%  ifft(  ) %>% Re() * sqrt( (length1 /2) )
+
+
+ }
+
+
+
+ library(Rwave)
+library(signal)
+ # https://pipiras.sites.oasis.unc.edu/timeseries/Nonstationary_2_-_Time_Frequency_-_Menu.html#what_is_this_all_about
+ "../machineLearningData/gravitationalWaves/train/f/2/f/f2f0bbf138.npy" %>%
+   whitenWave(2) %>%
+#   npyLoad() %>% .[1,] %>%
+   cwtp( noctave=16, nvoice=16) %>%
+   image()
+  plot()
+
+sig1 =  "../machineLearningData/gravitationalWaves/train/f/2/f/f2f0bbf138.npy" %>%
+   npyLoad() %>% .[1,]
+
+
+ sig1 %>% specgram( n = min(1, 4096 ), Fs = 4096, window = hanning(4096),
+          overlap = ceiling(length(window)/2))
+
+
+ dir.exists
+ dir.create
+
+
+ "../machineLearningData/gravitationalWaves/train/ing_labels.csv" %>% read.csv() %>% View()
+
+
+ source_python( "cqtCalculation2.py")
+
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy" %>%
+   generateCQTNpyFromFile( ) %>%
+   array_reshape(c(3,69,65)) %>% .[1,,] %>%
+   image()
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy" %>%
+   generateCQTNpyFromFile( ) %>%
+   array_reshape(c(3,69,65)) %>% .[2,,] %>%
+   image()
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy" %>%
+   generateCQTNpyFromFile( ) %>%
+   array_reshape(c(3,69,65)) %>% .[3,,] %>%
+   image()
+
+
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff1e83d2e.npy" %>%
+   generateCQTNpyFromFile( ) %>%
+   array_reshape(c(3,69,65)) %>% .[1,,] %>%
+   image()
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff1e83d2e.npy" %>%
+   generateCQTNpyFromFile( ) %>%
+   array_reshape(c(3,69,65)) %>% .[2,,] %>%
+   image()
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff1e83d2e.npy" %>%
+   generateCQTNpyFromFile( ) %>%
+   array_reshape(c(3,69,65)) %>% .[3,,] %>%
+   image()
+
+
+
+

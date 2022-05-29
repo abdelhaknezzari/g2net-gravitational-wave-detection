@@ -31,6 +31,7 @@ We group the function we build in [file](functions.R)
 knitr::opts_chunk$set(echo = TRUE)
 
 source('functions.R')
+source("kerasModels.R")
 ```
 
 ## R Markdown
@@ -177,18 +178,8 @@ Use ggplot for the graphs 'geom_raster'
 Generate csv file with name of .npy files, with their paths and category type (1 : wave detected, 0: wave not detected )
 ```{r genrateCSVFileForWavesInfo, eval = FALSE}
 
-"../machineLearningData/gravitationalWaves/train" %>%
-        list.files( recursive = T,full.names = T, include.dirs = F) %>%
-        as_tibble() %>%
-        mutate( id = value %>% str_sub(55) ) %>%
-        rename(filePath = value) %>%
-        inner_join(
-                "../machineLearningData/gravitationalWaves/train/ing_labels.csv" %>%
-                        read.csv() %>%
-                        as_tibble() %>%
-                        mutate(id = paste0(id, ".npy") )
-        ) %>%
-        write.csv( file = "../machineLearningData/gravitationalWaves/train/file_labels.csv")
+"../machineLearningData/gravitationalWaves/train" %>% generateTrainLabels()
+
 
 ```
 
@@ -466,9 +457,21 @@ two ways to model that we can see for the moment:
 
 
 
+One model for one wave location:
+it is taking a very huge time to train every model, for the training and validation, we load the data from files, and not once, we do that in streaming
+functions:
+dataGeneratorFromFiles1Wave()
+dataValidationGeneratorFromFiles1Wave()
+
+both function have batch size parameter, to specifiy the amount of waves we read for our training and validation
+
+we split the data for training 80% and 20% validation
+
+
+
 ```{r }
 
-modelWave1 <- trainWith1Wave( waveIndex = 1)
+modelWave1 <- trainWith1Wave( waveIndex = 1,batchSize = 100)
 modelWave2 <- trainWith1Wave( waveIndex = 2)
 modelWave3 <- trainWith1Wave( waveIndex = 3)
 
@@ -476,11 +479,202 @@ modelWave3 <- trainWith1Wave( waveIndex = 3)
 ```
 
 
+we need to perform a precalculation of MFCC for all the signals
+
+```{r }
+
+"../machineLearningData/gravitationalWaves/train/a/c/e/" %>% str_replace("train", "MFCC")
+
+```
+
+we run the background [job](jobs/generateMfccFiles.R) to calculate MFCC for all signals, it takes 5 hours
+
+
+
+generate mfcc labels and store them in csv file
+
+```{r }
+generateMfccLabelsFile( )
+```
+
+it is a big data problem, we reduced the data to handle to 15 giga octet of data, (the original data were )
+
+we will extract the mfcc coefficients to many csv files, and we will loop on the CSV files one by one to perform the training and validation of neural network models
+
+the splitting of data to csv files is done with job : [extractMfccToDataFrames.R](jobs/extractMfccToDataFrames.R)
+the job can be launched via the 'R jobs' that is accessible from Rstudio or from R language for Intelliji
+as shown in the picture ![](otherPictures/startJobs.JPG)
+the jobs also can be trigger with R function 'rstudioapi::jobRunScript'
+inside every job we are calling the function splitSaveCSVMfccFiles, we give to the function the number of files to be generated from the data,
+it
+
+
+
+
+to improve the speed of reading the data, we need to convert the CSV files to RDS format, with the following call of function we can show how time we can gain by using RDS files instead of CSV,
+
+
+```{r }
+comparePerfromanceCsvRds()
+
+
+```
+we can gain 35 times in speed (77279197400 / 2164864200)
+
+
+we run a batch job at file [convertToRdsJob](jobs/convertCsvToRds.R)
+
+
+
+we trained the neural network model with the calculated MFCC data, but the accuracy of training and validation always stays at 50%
+which can mean two things:
+either data not correct
+or models not right
+
+we changed the models but we're still getting the same bad results
+
+
+
+
+change to use CQT transformation , unfortunately it exists only in python, provide functions in python to do the calculation
+
+
+
 ```{r }
 
 
+library(reticulate)
 
+vv <- import("nnAudio.Spectrogram")
+
+np <- import("numpy")
+torch <- import("torch")
+
+
+
+
+cqt =  vv$CQT1992v2(sr=2048, hop_length=64, fmin=20, fmax=1024, bins_per_octave=12, norm=1, window='hann', center=T, pad_mode='reflect', trainable=F, output_format='Magnitude', verbose=F)
+
+
+waveform <- np$load("00001f4945.npy") %>% np$hstack()
+waveform <- waveform / np$max(waveform)
+waveform = torch$from_numpy(waveform)$float()
+
+
+cqt_image = cqt(waveform)
+cqt_image = np$array(cqt_image)
+
+cqt_image = np$transpose(cqt_image, c(1,2,0))
+
+
+"00001f4945.npy" %>% readWaveFromNpy(1) %>% cqt()
+
+
+cqt("00001f4945.npy" %>% npyLoad() %>%.[1,])
+
+
+np$load("image0.npy") %>% image()
+np$load("image1.npy") %>% image()
+np$load("image2.npy") %>% image()
+
+
+
+
+vv = py_run_file("cqtCalculation2.py")
+vv = np$load("image.npy") %>%
+  array_reshape(c(3,69, 65 ))
+
+vv[1,,] %>% image()
+vv[2,,] %>% image()
+vv[3,,] %>% image()
 
 
 
 ```
+
+
+
+```{python }
+
+import os
+from matplotlib import pyplot as plt
+from nnAudio.Spectrogram import CQT1992v2
+from scipy import signal, fft
+from scipy.signal import butter, lfilter
+import numpy as np
+import torch
+import math
+from scipy.interpolate import interp1d
+from scipy.signal import butter, lfilter
+
+
+BATCH_SIZE = 256
+EPOCHS = 1
+EXAMPLE_IDENTIFIER_1 = "00000e74ad"
+EXAMPLE_IDENTIFIER_0 = "00001f4945"
+RANDOM_SAMPLE_SIZE = 1
+PERFORM_FITTING = True
+SAMPLING_FREQUENCY = 2048
+SAMPLES_1 = 4096
+SAMPLES_3 = 3 * SAMPLES_1
+USE_TRAIN_SUBSET = False
+USE_TEST_SUBSET = False
+SUBSET_SIZE = 1024
+LEARNING_RATE = 0.001
+TRAIN_TEST_SPLIT = 0.95
+
+
+
+
+
+def get_array(identifier):
+    path = f"{identifier}.npy"
+    return np.load(path)
+
+
+def whiten(waveform):
+    window = signal.hann(waveform.size)
+    spectrum = fft.fft(waveform * window)
+    mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
+    return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)/2)
+
+def get_whitened_data(id, detector):
+    return whiten(get_array(id)[detector])
+
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
+
+
+def get_cqt_spectrogram_of_data(data):
+    cqt = CQT1992v2(sr=SAMPLING_FREQUENCY, hop_length=64, fmin=20, fmax=1024, bins_per_octave=12, norm=1, window='hann', center=True, pad_mode='reflect', trainable=False, output_format='Magnitude', verbose=False)
+    waveform = data
+    waveform = waveform / np.max(waveform)
+    waveform = torch.from_numpy(waveform).float()
+    cqt_image = cqt(waveform)
+    cqt_image = np.array(cqt_image)
+    cqt_image = np.transpose(cqt_image, (1,2,0))
+    return cqt_image
+
+
+
+lowcut=50
+highcut=500
+id= "fac5791f7b"
+
+
+
+```
+
+
