@@ -613,7 +613,7 @@ save3SignalCQTAsNpy <- function( filePath = "../machineLearningData/gravitationa
   filePathLength <- filePath %>% str_length()
   path <- filePath %>% str_sub(0,54)
   fileName <-  filePath %>% str_sub(55,filePathLength)
-  pathTarget <- path %>% str_replace("train", "cqt")
+  pathTarget <- path %>% str_replace("train", "cqtNew2")
 
   cqtFilePath <- sprintf("%s/%s",pathTarget ,fileName )
 

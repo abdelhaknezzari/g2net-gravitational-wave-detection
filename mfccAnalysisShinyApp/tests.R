@@ -132,9 +132,26 @@ sig1 =  "../machineLearningData/gravitationalWaves/train/f/2/f/f2f0bbf138.npy" %
 
  "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy" %>%
    generateCQTNpyFromFile( ) %>%
-   array_reshape(c(3,69,65)) %>% .[3,,] %>%
+   array_reshape(c(3,69,65)) %>% .[3,,] %>%  array_reshape(4485) %>% dim()
    image()
 
+
+ generateCQTNpyFromFileAsList <- function(path =  "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy") {
+    list( coeficients = path %>%
+     generateCQTNpyFromFile() %>% toString(), wavePath = path ) }
+
+
+ c("../machineLearningData/gravitationalWaves/train/f/f/f/fff1e83d2e.npy",
+   "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy") %>%
+   lapply( generateCQTNpyFromFileAsList ) %>%
+   bind_rows() %>% View()
+
+
+
+
+ "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy" %>%
+   generateCQTNpyFromFile( ) %>% dim()
+   array_reshape(c(3,69,65))
 
 
  "../machineLearningData/gravitationalWaves/train/f/f/f/fff1e83d2e.npy" %>%
