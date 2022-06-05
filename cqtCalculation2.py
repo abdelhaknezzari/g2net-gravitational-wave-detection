@@ -58,6 +58,7 @@ LEARNING_RATE = 0.001
 TRAIN_TEST_SPLIT = 0.95
 
 
+
 def get_array(identifier):
     path = f"{identifier}.npy"
     return np.load(path)
@@ -328,6 +329,40 @@ class simpleCQT():
 
         return CQT * torch.sqrt(self.lenghts.view(-1, 1))
 
+def create_cqt_kernels(
+        Q,
+        fs,
+        fmin,
+        bins_per_octave=12,
+        norm=1,
+        window="hann",
+        fmax=None
+):
+    n_bins = np.ceil( bins_per_octave * np.log2(fmax / fmin))
+    freqs = fmin * 2.0 ** (np.r_[0:n_bins] / float(bins_per_octave))
+
+    alpha = 2.0 ** (1.0 / bins_per_octave) - 1.0
+    lengths = np.ceil(Q * fs / (freqs  / alpha))
+    max_len = int(max(lengths))
+    fftLen = int(2 ** (np.ceil(np.log2(max_len))))
+
+    tempKernel = np.zeros((int(n_bins), int(fftLen)), dtype=np.complex64)
+
+    for k in range(0, int(n_bins)):
+        freq = freqs[k]
+        l = lengths[k]
+        if l % 2 == 1:
+            start = int(np.ceil(fftLen / 2.0 - l / 2.0)) - 1
+        else:
+            start = int(np.ceil(fftLen / 2.0 - l / 2.0))
+
+        window_dispatch = get_window(window, int(l), fftbins=True)
+        sig = window_dispatch * np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / fs) / l
+
+
+        tempKernel[k, start : start + int(l)] = sig / np.linalg.norm(sig, norm)
+
+    return tempKernel, fftLen, torch.tensor(lengths).float(), freqs
 
 def get_cqt_spectrogram_of_data(data):
     cqt = CQT2022v2(sr=SAMPLING_FREQUENCY, hop_length=64, fmin=20, fmax=1024, bins_per_octave=12, filter_scale = 1)
