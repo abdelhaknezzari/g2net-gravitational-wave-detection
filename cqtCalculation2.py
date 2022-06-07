@@ -256,18 +256,27 @@ class simpleCQT():
             pass
         return x
 
+    def calcQ(self):
+        return float(self.filter_scale) / (2 ** (1 / self.bins_per_octave) - 1)
 
-    def create_cqt_kernels(self, Q):
-        n_bins = np.ceil( self.bins_per_octave * np.log2(self.fmax / self.fmin) )
-        freqs = self.fmin * 2.0 ** (np.r_[0:n_bins] / float(self.bins_per_octave))
-        alpha = 2.0 ** (1.0 / self.bins_per_octave) - 1.0
-        lengths = np.ceil(Q * self.SAMPLING_FREQUENCY  / (freqs  / alpha))
+    def calcNBins(self):
+        return np.ceil( self.bins_per_octave * np.log2(self.fmax / self.fmin) )
 
+    def calcFreqs(self,n_bins):
+        return  self.fmin * 2.0 ** (np.r_[0:n_bins] / float(self.bins_per_octave))
+
+    def calcAlpha(self):
+            return  2.0 ** (1.0 / self.bins_per_octave) - 1.0
+
+    def calcLengths(self,freqs,alpha,Q):
+        return  np.ceil(Q * self.SAMPLING_FREQUENCY  / (freqs  / alpha))
+
+    def calcFFTLen(self,lengths):
         max_len = int(max(lengths))
-        fftLen = int(2 ** (np.ceil(np.log2(max_len))))
+        return int(2 ** (np.ceil(np.log2(max_len))))
 
+    def calcKernels(self,n_bins,freqs,lengths,fftLen):
         tempKernel = np.zeros((int(n_bins), int(fftLen)), dtype=np.complex64)
-
         for k in range(0, int(n_bins)):
             freq = freqs[k]
             l = lengths[k]
@@ -280,10 +289,18 @@ class simpleCQT():
             window_dispatch = get_window(self.window, int(l), fftbins=True)
             sig = window_dispatch * np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / self.SAMPLING_FREQUENCY ) / l
             tempKernel[k, start : start + int(l)] = sig / np.linalg.norm(sig, self.norm)
+        return tempKernel
 
 
+    def create_cqt_kernels(self):
+        Q = self.calcQ()
+        n_bins = self.calcNBins()
+        freqs = self.calcFreqs(n_bins)
+        alpha = self.calcAlpha()
+        lengths = self.calcLengths(freqs  , alpha,Q)
+        fftLen = self.calcFFTLen(lengths)
+        tempKernel = self.calcKernels(n_bins,freqs,lengths,fftLen)
         return tempKernel, fftLen, torch.tensor(lengths).float(), freqs
-
 
 
     def getHannWindow(self, size):
@@ -314,9 +331,9 @@ class simpleCQT():
 
 
     def calcCQT(self,x):
-        Q = float(self.filter_scale) / (2 ** (1 / self.bins_per_octave) - 1)
 
-        self.cqt_kernels, self.kernel_width, self.lenghts, self.freqs = self.create_cqt_kernels( Q)
+
+        self.cqt_kernels, self.kernel_width, self.lenghts, self.freqs = self.create_cqt_kernels( )
 
         self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
         self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
