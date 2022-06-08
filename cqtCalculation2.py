@@ -70,6 +70,13 @@ def test1(index):
     return int(index)
 
 
+
+def whiten5(path):
+    spectrum = whiten4(path)
+    return np.sqrt(np.real(spectrum))
+
+
+
 def whiten0(path,index):
     waves = np.load(path)
     return waves[int(index)]
@@ -247,6 +254,32 @@ class simpleCQT():
         self.norm = 1
         self.window = "hann"
 
+
+    def loadWave(self,path,index):
+        waves = np.load(path)
+        return waves[int(index)]
+
+
+
+    def singnalProductWindow(self,path,index):
+        waveform = self.loadWave(path,index)
+        window = self.getHannWindow(int(waveform.size))
+        return waveform * window
+
+    def singnalProductWindowFft(self,path,index):
+        windowWave = self.singnalProductWindow(path,index)
+        return fft.fft(windowWave)
+
+    def energyOfSpectrum(self,path,index):
+        windowWaveSpec = self.singnalProductWindowFft(path,index)
+        return windowWaveSpec*np.conj(windowWaveSpec)
+
+    def energyOfSpectrumSqrt(self,path,index):
+        spectrum = self.singnalProductWindowFft(path,index)
+        return np.sqrt(np.real(spectrum))
+
+
+
     def broadcast_dim(self,x):
         if x.dim() == 2:
             x = x[:, None, :]
@@ -308,8 +341,9 @@ class simpleCQT():
             self.hannWindows = signal.hann(int(size))
         return self.hannWindows
 
-    def whiten(self,waveform):
-        window = self.getHannWindow(waveform.size)
+    def whiten(self,path,index):
+        waveform = self.loadWave(path,index)
+        window = self.getHannWindow(int(waveform.size))
         spectrum = fft.fft(waveform * window)
         mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
         return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)/2)
@@ -403,4 +437,8 @@ def generateCQTNpyFromFile(path):
 
 
 
+    # source_python( "cqtCalculation2.py")
 
+    # cqtCalc = simpleCQT()
+
+    # "../machineLearningData/gravitationalWaves/train/f/2/f/f2f0bbf138.npy"  %>% cqtCalc$loadWave(0) %>% plot()
