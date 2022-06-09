@@ -295,14 +295,23 @@ class simpleCQT():
     def calcNBins(self):
         return np.ceil( self.bins_per_octave * np.log2(self.fmax / self.fmin) )
 
-    def calcFreqs(self,n_bins):
-        return  self.fmin * 2.0 ** (np.r_[0:n_bins] / float(self.bins_per_octave))
+    def calcFreqs(self):
+        return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
+
+    def calcFreqs2(self):
+        return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
+
+    def calcFreqs3(self,n):
+        return  2 ** np.r_[0:int(n)]
+
 
     def calcAlpha(self):
             return  2.0 ** (1.0 / self.bins_per_octave) - 1.0
 
-    def calcLengths(self,freqs,alpha,Q):
-        return  np.ceil(Q * self.SAMPLING_FREQUENCY  / (freqs  / alpha))
+    def calcLengths(self):
+        return  np.ceil(self.calcQ() * self.SAMPLING_FREQUENCY  / (self.calcFreqs()  / self.calcAlpha()))
+
+
 
     def calcFFTLen(self,lengths):
         max_len = int(max(lengths))

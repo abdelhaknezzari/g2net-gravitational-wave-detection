@@ -1,83 +1,84 @@
-#include <RcppArmadillo.h>
+#include "CqtCalculationRcpp.h"
 
-using namespace Rcpp;
-using namespace arma;
-
-// [[Rcpp::depends(RcppArmadillo)]]
-
-double pi = 3.141592653589793238463 ;
+CqtCalculationRcpp cqtCalculationRcpp;
 
 // [[Rcpp::export]]
 cx_vec hanningWindow(int n) {
-  cx_vec w(n) ;
-  if (n == 1) {
-    w[0] = 1;
-  } else {
-    for (int i = 0 ; i < n ; i++) {
-       w[i] = 0.5 - 0.5 * cos( (2 * pi * i) / n);
-    }
-  }
-  return w;
+   return cqtCalculationRcpp.hanningWindow(n);
 }
-
-
 
 // [[Rcpp::export]]
 cx_vec applyWindowToSignal(cx_vec &signal) {
-     cx_vec wSignal( signal.size() ) ;
-     cx_vec window = hanningWindow( signal.size());
+    return cqtCalculationRcpp.applyWindowToSignal(signal);
+}
 
-    for (unsigned int i = 0 ; i < signal.size() ; i++) {
-       wSignal[i] = window[i] * signal[i] ;
-    }
+// [[Rcpp::export]]
+cx_vec signalProductWindowFft(cx_vec &signal) {
+    return cqtCalculationRcpp.signalProductWindowFft(signal);
+}
 
-    return wSignal;
+// [[Rcpp::export]]
+cx_vec calcProduct(cx_vec &v1,cx_vec &v2) {
+    return cqtCalculationRcpp.calcProduct(v1,v2);
 }
 
 
 // [[Rcpp::export]]
-cx_vec signalProductWindowFft(cx_vec &signal) {
-     cx_vec windowSignal = applyWindowToSignal(signal);
-    return fft(windowSignal);
+cx_vec calcProduct2(cx_vec &v1,cx_vec &v2) {
+    return cqtCalculationRcpp.calcProduct2(v1,v2);
+}
+
+// [[Rcpp::export]]
+cx_vec calcDiv(cx_vec &v1,vec &v2) {
+    return cqtCalculationRcpp.calcDiv(v1,v2);
 }
 
 // [[Rcpp::export]]
 vec energyOfSpectrum(cx_vec &signal) {
-     cx_vec windowSignalFft     = signalProductWindowFft(signal);
-     cx_vec windowSignalFftConj = conj(windowSignalFft);
-     cx_vec product(windowSignalFft.size());
-     for (unsigned int i = 0 ; i < windowSignalFft.size() ; i++) {
-        product[i] = windowSignalFft[i] * windowSignalFftConj[i] ;
-     }
+    return cqtCalculationRcpp.energyOfSpectrum(signal);
+}
 
-    return sqrt(real(product));
+// [[Rcpp::export]]
+vec whiten(cx_vec &signal) {
+     return cqtCalculationRcpp.whiten(signal);
+}
+
+// [[Rcpp::export]]
+double calcQ() {
+     return cqtCalculationRcpp.calcQ();
+}
+
+// [[Rcpp::export]]
+double calcNBins() {
+     return cqtCalculationRcpp.calcNBins();
+}
+
+// [[Rcpp::export]]
+vec calcFreqs() {
+     return cqtCalculationRcpp.calcFreqs();
 }
 
 
 // [[Rcpp::export]]
-vec whiten(cx_vec &signal) {
-     cx_vec spectrum = signalProductWindowFft(signal);
-     vec mag = sqrt(real(dot(spectrum,conj(spectrum) ) ) );
-     return mag;
-
-//     cx_vec windowSignalFft     = signalProductWindowFft(signal);
-//     cx_vec windowSignalFftConj = conj(windowSignalFft);
-//     cx_vec product(windowSignalFft.size());
-//     for (unsigned int i = 0 ; i < windowSignalFft.size() ; i++) {
-//        product[i] = windowSignalFft[i] * windowSignalFftConj[i] ;
-//     }
-//
-//    return sqrt(real(product));
+double calcAlpha() {
+     return cqtCalculationRcpp.calcAlpha();
 }
 
 
-//    def whiten(self,path,index):
-//
-//
-//        spectrum = fft.fft(waveform * window)
-//        mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
-//        return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)/2)
+// [[Rcpp::export]]
+vec calcLengths() {
+     return cqtCalculationRcpp.calcLengths();
+}
 
+
+
+
+
+//    def calcAlpha(self):
+//            return  2.0 ** (1.0 / self.bins_per_octave) - 1.0
+//
+//    def calcLengths(self,freqs,alpha,Q):
+//        return  np.ceil(Q * self.SAMPLING_FREQUENCY  / (freqs  / alpha))
 
 
 // [[Rcpp::export]]
