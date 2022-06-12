@@ -19,7 +19,7 @@ class CqtCalculationRcpp {
              const int norm = 1;
              const String window = "hann";
 
-            cx_vec hanningWindow(int n);
+            vec hanningWindow(int n);
             cx_vec applyWindowToSignal(cx_vec &signal);
             cx_vec signalProductWindowFft(cx_vec &signal);
             cx_vec calcProduct(cx_vec &v1,cx_vec &v2);
@@ -32,7 +32,10 @@ class CqtCalculationRcpp {
             vec calcFreqs();
             double calcAlpha();
             vec calcLengths();
-
+            int calcFFTLen();
+            cx_mat calcKernels();
+            cx_mat calcKernelWindows();
+            cx_mat calcKernelSignals() ;
         private:
           double min, max;
 };
@@ -40,22 +43,63 @@ class CqtCalculationRcpp {
 
 
 
-cx_vec CqtCalculationRcpp::hanningWindow(int n)
+//vec CqtCalculationRcpp::hanningWindow(int N)
+//{
+//  if (N == 1) {
+//     return  {1};
+//  } else {
+//  	  vec w(N);
+//  	if(N%2==0){
+//  	  int half = N/2;
+//  	  w.subvec(0,half - 1) = 0.54-0.46* cos( (regspace<vec>(0,1, half - 1 ) + 1 ) * 2 *  datum::pi / (N + 1) ) ;
+//  	  w.subvec(half ,N - 1 ) = reverse(w.subvec(0,half - 1));
+//  	} else {
+//  	  int half = (N+1)/2;
+//  	  w.subvec(0,half - 1) = 0.54-0.46* cos( (regspace<vec>(0,1, half - 1 ) + 1 ) * 2 *  datum::pi / (N + 1) ) ;
+//  	  w.subvec(half ,N - 1 ) = reverse(w.subvec(0,half - 2));
+//  	}
+//
+//    for(int i=N-1; i>=1; i--)
+//        w[i] = w[i-1];
+//    w[0] = 0.0;
+//
+//     return w;
+//  }
+//}
+
+
+vec CqtCalculationRcpp::hanningWindow(int N)
 {
-  cx_vec w(n) ;
-  if (n == 1) {
-    w[0] = 1;
+  if (N == 1) {
+     return  {1};
   } else {
-    for (int i = 0 ; i < n ; i++) {
-       w[i] = 0.5 - 0.5 * cos( (2 * pi * i) / n);
-    }
+     return 0.5-0.5*cos(2.0* datum::pi *  regspace<vec>(0,1, N -1 )  /N  );
   }
-  return w;
 }
+
+
+
+
+//def hamming(M, sym=True):
+//    """The M-point Hamming window.
+//    """
+//    if M < 1:
+//        return np.array([])
+//    if M == 1:
+//        return np.ones(1,'d')
+//    odd = M % 2
+//    if not sym and not odd:
+//        M = M+1
+//    n = np.arange(0,M)
+//    w = 0.54-0.46*np.cos(2.0*np.pi*n/(M-1))
+//    if not sym and not odd:
+//        w = w[:-1]
+//    return w
+
 
 cx_vec CqtCalculationRcpp::applyWindowToSignal(cx_vec &signal) {
      cx_vec wSignal( signal.size() ) ;
-     cx_vec window = hanningWindow( signal.size());
+     vec window = hanningWindow( signal.size());
 
     for (unsigned int i = 0 ; i < signal.size() ; i++) {
        wSignal[i] = window[i] * signal[i] ;
@@ -124,40 +168,81 @@ double CqtCalculationRcpp::calcNBins() {
 
 
 vec CqtCalculationRcpp::calcFreqs() {
+//        return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
+
      double nBins =  calcNBins();
-     vec  range = regspace(0, nBins);
+     vec  range = regspace(0, nBins - 1);
      vec  freqs(range.size());
      for( unsigned int i = 0 ; i < range.size(); i ++ ) {
         freqs[i] = fmin * pow(2,range[i]/(double)bins_per_octave);
      }
-
      return  freqs;
 }
-
-
 
 double CqtCalculationRcpp::calcAlpha() {
      return pow(2, 1.0 / bins_per_octave) - 1.0;
 }
 
 vec CqtCalculationRcpp::calcLengths() {
-     vec freqs = calcFreqs() / calcAlpha();
-     return ceil(SAMPLING_FREQUENCY * calcQ() / freqs);
+     return ceil( calcQ() * SAMPLING_FREQUENCY  * calcAlpha() / calcFreqs() );
+}
+
+
+int CqtCalculationRcpp::calcFFTLen() {
+     return (int)pow(2,ceil( log2((int)calcLengths().max())));
+}
+
+cx_mat CqtCalculationRcpp::calcKernels() {
+   int fftLen = (int)calcFFTLen();
+   int nBins = (int)calcNBins();
+   vec lengths = calcLengths();
+   vec freqs = calcFreqs();
+   cx_mat kernals = zeros<cx_mat>(nBins,fftLen);
+
+    for( int k = 0 ; k < nBins ; k++ ){
+        int start = (int)ceil((fftLen-lengths[k])/2) - ( (int)lengths[k] % 2 == 1 ? 1 : 0);
+        int high = (int)lengths[k]/2 - 1 ;
+        int low = (int)lengths[k]/2 + ( (int)lengths[k] % 2 == 1 ? 1 : 0);
+
+        cx_vec signalWindow =  hanningWindow(lengths[k]) % exp( regspace<cx_vec>(-low,1, high) * 2i * datum::pi * freqs[k] / SAMPLING_FREQUENCY ) / lengths[k];
+        kernals.row(k).cols(start, start+lengths[k]-1) = (as<cx_rowvec>)(wrap(signalWindow / arma::norm(signalWindow,1)));
+    }
+    return kernals;
 }
 
 
 
+cx_mat CqtCalculationRcpp::calcKernelWindows() {
+   int fftLen = (int)calcFFTLen();
+   int nBins = (int)calcNBins();
+   vec lengths = calcLengths();
+   vec freqs = calcFreqs();
+   cx_mat kernals = zeros<cx_mat>(nBins,fftLen);
+
+    for( int k = 0 ; k < nBins ; k++ ){
+        int start = (int)ceil((fftLen-lengths[k])/2) - ( (int)lengths[k] % 2 == 1 ? 1 : 0);
+
+        kernals.row(k).cols(start, start+lengths[k]-1) = (as<cx_rowvec>)(wrap(hanningWindow(lengths[k]) ) );
+    }
+    return kernals;
+}
 
 
-//    def calcAlpha(self):
-//            return  2.0 ** (1.0 / self.bins_per_octave) - 1.0
-//
-//    def calcLengths(self,freqs,alpha,Q):
-//        return  np.ceil(Q * self.SAMPLING_FREQUENCY  / (freqs  / alpha))
 
+cx_mat CqtCalculationRcpp::calcKernelSignals() {
+   int fftLen = (int)calcFFTLen();
+   int nBins = (int)calcNBins();
+   vec lengths = calcLengths();
+   vec freqs = calcFreqs();
+   cx_mat kernals = zeros<cx_mat>(nBins,fftLen);
 
+    for( int k = 0 ; k < nBins ; k++ ){
+        int start = (int)ceil((fftLen-lengths[k])/2) - ( (int)lengths[k] % 2 == 1 ? 1 : 0);
+        int high = (int)lengths[k]/2 - 1 ;
+        int low = (int)lengths[k]/2 + ( (int)lengths[k] % 2 == 1 ? 1 : 0);
 
-
-
-//    def calcNBins(self):
-//        return np.ceil( self.bins_per_octave * np.log2(self.fmax / self.fmin) )
+        cx_vec signalWindow =  exp( regspace<cx_vec>(-low,1, high) * 2i * datum::pi * freqs[k] / SAMPLING_FREQUENCY ) / lengths[k];
+        kernals.row(k).cols(start, start+lengths[k]-1) = (as<cx_rowvec>)(wrap(signalWindow / arma::norm(signalWindow,1)));
+    }
+    return kernals;
+}

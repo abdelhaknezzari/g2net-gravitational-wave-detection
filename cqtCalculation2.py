@@ -278,7 +278,8 @@ class simpleCQT():
         spectrum = self.singnalProductWindowFft(path,index)
         return np.sqrt(np.real(spectrum))
 
-
+    def getHannWindow(self, size):
+        return signal.hann(int(size))
 
     def broadcast_dim(self,x):
         if x.dim() == 2:
@@ -295,15 +296,9 @@ class simpleCQT():
     def calcNBins(self):
         return np.ceil( self.bins_per_octave * np.log2(self.fmax / self.fmin) )
 
-    def calcFreqs(self):
-        return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
-
-    def calcFreqs2(self):
-        return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
-
-    def calcFreqs3(self,n):
-        return  2 ** np.r_[0:int(n)]
-
+    def calcFFTLen(self):
+        max_len = int(max(self.calcLengths()))
+        return int(2 ** (np.ceil(np.log2(max_len))))
 
     def calcAlpha(self):
             return  2.0 ** (1.0 / self.bins_per_octave) - 1.0
@@ -311,15 +306,17 @@ class simpleCQT():
     def calcLengths(self):
         return  np.ceil(self.calcQ() * self.SAMPLING_FREQUENCY  / (self.calcFreqs()  / self.calcAlpha()))
 
+    def calcFreqs(self):
+        return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
 
+    def calcKernels(self):
+        lengths = self.calcLengths()
+        freqs = self.calcFreqs()
+        fftLen  = self.calcFFTLen()
+        nBins = self.calcNBins()
+        tempKernel = np.zeros( (int(nBins), int(fftLen )), dtype=np.complex64 )
 
-    def calcFFTLen(self,lengths):
-        max_len = int(max(lengths))
-        return int(2 ** (np.ceil(np.log2(max_len))))
-
-    def calcKernels(self,n_bins,freqs,lengths,fftLen):
-        tempKernel = np.zeros((int(n_bins), int(fftLen)), dtype=np.complex64)
-        for k in range(0, int(n_bins)):
+        for k in range(0, int(nBins)):
             freq = freqs[k]
             l = lengths[k]
 
@@ -332,6 +329,43 @@ class simpleCQT():
             sig = window_dispatch * np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / self.SAMPLING_FREQUENCY ) / l
             tempKernel[k, start : start + int(l)] = sig / np.linalg.norm(sig, self.norm)
         return tempKernel
+
+    def calcKernelWindows(self):
+        lengths = self.calcLengths()
+        fftLen  = self.calcFFTLen()
+        nBins = self.calcNBins()
+        tempKernel = np.zeros( (int(nBins), int(fftLen )), dtype=np.complex64 )
+        for k in range(0, int(nBins)):
+            l = lengths[k]
+            if l % 2 == 1:
+                start = int(np.ceil(fftLen / 2.0 - l / 2.0)) - 1
+            else:
+                start = int(np.ceil(fftLen / 2.0 - l / 2.0))
+            tempKernel[k, start : start + int(l)] = get_window(self.window, int(l), fftbins=True)
+        return tempKernel
+
+    def calcKernelSignals(self):
+        lengths = self.calcLengths()
+        freqs = self.calcFreqs()
+        fftLen  = self.calcFFTLen()
+        nBins = self.calcNBins()
+        tempKernel = np.zeros( (int(nBins), int(fftLen )), dtype=np.complex64 )
+
+        for k in range(0, int(nBins)):
+            freq = freqs[k]
+            l = lengths[k]
+
+            if l % 2 == 1:
+                start = int(np.ceil(fftLen / 2.0 - l / 2.0)) - 1
+            else:
+                start = int(np.ceil(fftLen / 2.0 - l / 2.0))
+            sig = np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / self.SAMPLING_FREQUENCY ) / l
+            tempKernel[k, start : start + int(l)] = sig / np.linalg.norm(sig, self.norm)
+        return tempKernel
+
+
+    def calcKernels3(self, signal):
+        return np.linalg.norm(signal, self.norm)
 
 
     def create_cqt_kernels(self):
@@ -346,9 +380,7 @@ class simpleCQT():
 
 
     def getHannWindow(self, size):
-        if len(self.hannWindows) == 0:
-            self.hannWindows = signal.hann(int(size))
-        return self.hannWindows
+        return signal.hann(int(size))
 
     def whiten(self,path,index):
         waveform = self.loadWave(path,index)
@@ -445,9 +477,11 @@ def generateCQTNpyFromFile(path):
 
 
 
-
+ #  library(reticulate)
     # source_python( "cqtCalculation2.py")
 
     # cqtCalc = simpleCQT()
 
     # "../machineLearningData/gravitationalWaves/train/f/2/f/f2f0bbf138.npy"  %>% cqtCalc$loadWave(0) %>% plot()
+
+

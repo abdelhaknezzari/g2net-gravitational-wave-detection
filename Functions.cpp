@@ -3,7 +3,7 @@
 CqtCalculationRcpp cqtCalculationRcpp;
 
 // [[Rcpp::export]]
-cx_vec hanningWindow(int n) {
+vec hanningWindow(int n) {
    return cqtCalculationRcpp.hanningWindow(n);
 }
 
@@ -71,26 +71,35 @@ vec calcLengths() {
 }
 
 
-
-
-
-//    def calcAlpha(self):
-//            return  2.0 ** (1.0 / self.bins_per_octave) - 1.0
-//
-//    def calcLengths(self,freqs,alpha,Q):
-//        return  np.ceil(Q * self.SAMPLING_FREQUENCY  / (freqs  / alpha))
-
+// [[Rcpp::export]]
+int calcFFTLen() {
+     return cqtCalculationRcpp.calcFFTLen();
+}
 
 // [[Rcpp::export]]
-cx_vec  waveSpectrum(cx_vec &waveform) {
-  cx_vec spec = fft(conv(hanningWindow(waveform.size()),  waveform));
-  return spec.t() * conj( spec) ;
-//  double mag = sqrt( real(  spec.t() * conj( spec)  ) );
-//
-//  return fft(conv(hanningWindow(waveform.size()),  waveform));
+cx_mat calcKernels() {
+    return cqtCalculationRcpp.calcKernels();
 }
 
 
-//    spectrum = fft.fft(waveform * window)
-//    mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
-//    return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)/2)
+
+// [[Rcpp::export]]
+cx_mat calcKernelWindows() {
+   return cqtCalculationRcpp.calcKernelWindows();
+}
+
+
+// [[Rcpp::export]]
+cx_mat calcKernelSignals() {
+   return cqtCalculationRcpp.calcKernelSignals();
+}
+
+
+// [[Rcpp::export]]
+cx_mat calcKernels3( cx_mat signals, cx_mat windows) {
+   return windows % signals;
+}
+
+
+
+
