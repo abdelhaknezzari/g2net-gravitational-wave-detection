@@ -96,10 +96,17 @@ cx_mat calcKernelSignals() {
 
 
 // [[Rcpp::export]]
-cx_mat calcKernels3( cx_mat signals, cx_mat windows) {
-   return windows % signals;
+cx_vec padding( cx_vec &signal ) {
+   return cqtCalculationRcpp.padding(signal);
 }
 
+// [[Rcpp::export]]
+mat slideSignal( vec &signal , int stride, int numberOfRows ) {
+   return cqtCalculationRcpp.slideSignal(signal,stride,numberOfRows);
+}
 
-
+// [[Rcpp::export]]
+mat calcConv(  mat &matr, vec &signal , int stride) {
+   return cqtCalculationRcpp.calcConv(matr,signal,stride);
+}
 
