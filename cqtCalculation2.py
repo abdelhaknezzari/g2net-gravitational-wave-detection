@@ -257,7 +257,8 @@ class simpleCQT():
 
     def loadWave(self,path,index):
         waves = np.load(path)
-        return waves[int(index)]
+        wave = waves[int(index)]
+        return wave/max(wave)
 
 
 
@@ -364,18 +365,12 @@ class simpleCQT():
         return tempKernel
 
 
-    def calcKernels3(self, signal):
-        return np.linalg.norm(signal, self.norm)
-
 
     def create_cqt_kernels(self):
-        Q = self.calcQ()
-        n_bins = self.calcNBins()
-        freqs = self.calcFreqs(n_bins)
-        alpha = self.calcAlpha()
-        lengths = self.calcLengths(freqs  , alpha,Q)
-        fftLen = self.calcFFTLen(lengths)
-        tempKernel = self.calcKernels(n_bins,freqs,lengths,fftLen)
+        freqs = self.calcFreqs()
+        lengths = self.calcLengths()
+        fftLen = self.calcFFTLen()
+        tempKernel = self.calcKernels()
         return tempKernel, fftLen, torch.tensor(lengths).float(), freqs
 
 
@@ -403,6 +398,86 @@ class simpleCQT():
         image1 = self.get_cqt_spectrogram_of_data(self.whiten(waves[1]))
         image2 = self.get_cqt_spectrogram_of_data(self.whiten(waves[2]))
         return np.concatenate( (image0.reshape(69*65 )  , image1.reshape(69*65 )  , image2.reshape(69*65 ) ))
+
+    def calcCQT1(self):
+        self.cqt_kernels = self.calcKernels()
+        return self.cqt_kernels.real, self.cqt_kernels.imag
+
+    def calcCQT12(self,matr,n):
+        return np.array(torch.tensor(matr).unsqueeze(int(n)))
+
+    def calcCQT13(self,path,n):
+        waves = np.load(path)
+        padding = nn.ReflectionPad1d(self.calcFFTLen() // 2)
+        data = waves[int(n)]
+        data = torch.from_numpy(data / np.max(data)).float()
+        return np.array(padding(self.broadcast_dim(data)))
+
+    def calcCQT14(self,path,n):
+        return nn.ReflectionPad1d(int(n))
+
+
+
+    def calcCQT15(self,path,n):
+        waves = np.load(path)
+        padding = nn.ReflectionPad1d(int(n))
+        return  np.array(padding( self.broadcast_dim(waves[0])))
+
+
+    def calcCQT16(self,path,n):
+        waves = np.load(path)
+        return   np.array(self.broadcast_dim(waves[0]))
+
+    def calcCQT17(self,path,n):
+        waves = np.load(path)
+        padding = nn.ReflectionPad1d(int(n))
+        return  np.array(padding( self.broadcast_dim(waves[0])))
+
+
+
+
+    def calcCQT2(self):
+        self.cqt_kernels = self.calcKernels()
+        self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
+        self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
+
+        return np.array(self.cqt_kernels_real), np.array(self.cqt_kernels_imag)
+
+
+    def calcCQT3(self,x):
+        padding = nn.ReflectionPad1d(self.calcFFTLen()// 2)
+        return  padding( self.broadcast_dim(x))
+
+
+    def calcCQT4(self,x,len):
+        padding = nn.ReflectionPad1d(len)
+        return  padding( self.broadcast_dim(x))
+
+
+
+    def calcCQT61(self,mat,signal,strides):
+          return conv1d(self.broadcast_dim(torch.from_numpy(np.array(signal))), torch.tensor(mat).unsqueeze(1), stride=int(strides))
+# matrix(c(1,1,1,1,1,2,1,1,1,1,1,1),3,4) %>% cqtCalc$calcCQT61(c(2,7,3,2),1)
+# rep.int(1,10 * 10) %>% matrix(10,10) %>% cqtCalc$calcCQT61(rep.int(2,36),2)
+
+
+    def calcCQT6(self,path,waveNumber):
+        self.cqt_kernels, self.kernel_width, self.lenghts, self.freqs = self.create_cqt_kernels( )
+
+        self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
+        self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
+
+        padding = nn.ReflectionPad1d(self.kernel_width // 2)
+
+        waves = np.load(path)
+        x = waves[int(waveNumber)]
+        x = padding( self.broadcast_dim(x))
+        CQT_real = conv1d(x, self.cqt_kernels_real, stride=self.hop_length)
+        CQT_imag = conv1d(x, self.cqt_kernels_imag, stride=self.hop_length)
+        CQT = torch.sqrt(CQT_real.pow(2) + CQT_imag.pow(2))
+
+        return CQT * torch.sqrt(self.lenghts.view(-1, 1))
+
 
 
     def calcCQT(self,x):

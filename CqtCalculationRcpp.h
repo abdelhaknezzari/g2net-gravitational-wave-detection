@@ -36,37 +36,12 @@ class CqtCalculationRcpp {
             cx_mat calcKernels();
             cx_mat calcKernelWindows();
             cx_mat calcKernelSignals() ;
+            cx_vec padding( cx_vec &signal );
+            mat slideSignal( vec &signal , int stride, int numberOfRows );
+            mat calcConv(  mat &matr, vec &signal , int stride);
         private:
           double min, max;
 };
-
-
-
-
-//vec CqtCalculationRcpp::hanningWindow(int N)
-//{
-//  if (N == 1) {
-//     return  {1};
-//  } else {
-//  	  vec w(N);
-//  	if(N%2==0){
-//  	  int half = N/2;
-//  	  w.subvec(0,half - 1) = 0.54-0.46* cos( (regspace<vec>(0,1, half - 1 ) + 1 ) * 2 *  datum::pi / (N + 1) ) ;
-//  	  w.subvec(half ,N - 1 ) = reverse(w.subvec(0,half - 1));
-//  	} else {
-//  	  int half = (N+1)/2;
-//  	  w.subvec(0,half - 1) = 0.54-0.46* cos( (regspace<vec>(0,1, half - 1 ) + 1 ) * 2 *  datum::pi / (N + 1) ) ;
-//  	  w.subvec(half ,N - 1 ) = reverse(w.subvec(0,half - 2));
-//  	}
-//
-//    for(int i=N-1; i>=1; i--)
-//        w[i] = w[i-1];
-//    w[0] = 0.0;
-//
-//     return w;
-//  }
-//}
-
 
 vec CqtCalculationRcpp::hanningWindow(int N)
 {
@@ -76,25 +51,6 @@ vec CqtCalculationRcpp::hanningWindow(int N)
      return 0.5-0.5*cos(2.0* datum::pi *  regspace<vec>(0,1, N -1 )  /N  );
   }
 }
-
-
-
-
-//def hamming(M, sym=True):
-//    """The M-point Hamming window.
-//    """
-//    if M < 1:
-//        return np.array([])
-//    if M == 1:
-//        return np.ones(1,'d')
-//    odd = M % 2
-//    if not sym and not odd:
-//        M = M+1
-//    n = np.arange(0,M)
-//    w = 0.54-0.46*np.cos(2.0*np.pi*n/(M-1))
-//    if not sym and not odd:
-//        w = w[:-1]
-//    return w
 
 
 cx_vec CqtCalculationRcpp::applyWindowToSignal(cx_vec &signal) {
@@ -245,4 +201,37 @@ cx_mat CqtCalculationRcpp::calcKernelSignals() {
         kernals.row(k).cols(start, start+lengths[k]-1) = (as<cx_rowvec>)(wrap(signalWindow / arma::norm(signalWindow,1)));
     }
     return kernals;
+}
+
+
+
+
+cx_vec CqtCalculationRcpp::padding( cx_vec &signal ) {
+   int padLength = calcFFTLen() / 2;
+   int signalLength = signal.size();
+   cx_vec paddedSignal( padLength * 2 + signal.size() );
+
+   paddedSignal.subvec(padLength , signalLength + padLength - 1 ) = signal;
+   paddedSignal.subvec(0 ,padLength - 1 ) = reverse(signal.subvec(0 ,padLength-1 ));
+   paddedSignal.subvec(signalLength + padLength ,signalLength + 2 * padLength -1 ) = reverse(signal.subvec(signalLength - padLength ,signalLength - 1));
+   return paddedSignal;
+}
+
+
+mat CqtCalculationRcpp::slideSignal( vec &signal , int stride, int numberOfRows ) {
+   int signalLength = signal.size();
+   mat signalMatr( numberOfRows , (int)( (signalLength - numberOfRows ) /stride) +1   );
+    for( int k = 0 ; k  < (int)signalMatr.n_cols ; k++ ){
+        signalMatr.col(k) = signal.subvec( stride * k , stride * k + numberOfRows - 1  );
+    }
+   return signalMatr;
+}
+
+
+
+
+mat CqtCalculationRcpp::calcConv(  mat &matr, vec &signal , int stride) {
+   int ncol = matr.n_cols;
+   mat signalMatr = slideSignal(signal,stride,ncol);
+   return matr * signalMatr;
 }
