@@ -39,7 +39,7 @@ vec energyOfSpectrum(cx_vec &signal) {
 }
 
 // [[Rcpp::export]]
-vec whiten(cx_vec &signal) {
+cx_vec whiten(cx_vec &signal) {
      return cqtCalculationRcpp.whiten(signal);
 }
 
@@ -101,12 +101,139 @@ cx_vec padding( cx_vec &signal ) {
 }
 
 // [[Rcpp::export]]
-mat slideSignal( vec &signal , int stride, int numberOfRows ) {
+vec paddingParam( vec &signal, int pad ) {
+   return cqtCalculationRcpp.padding(signal,pad);
+}
+
+// [[Rcpp::export]]
+cx_mat slideSignal( cx_vec &signal , int stride, int numberOfRows ) {
    return cqtCalculationRcpp.slideSignal(signal,stride,numberOfRows);
 }
 
 // [[Rcpp::export]]
-mat calcConv(  mat &matr, vec &signal , int stride) {
+cx_mat calcConv( cx_mat &matr, cx_vec &signal , int stride) {
    return cqtCalculationRcpp.calcConv(matr,signal,stride);
+}
+
+
+//////////////////////////////////
+
+// [[Rcpp::export]]
+cx_vec generateWaveWhitenNormalise( cx_vec &signal ) {
+   return cqtCalculationRcpp.generateWaveWhitenNormalise(signal);
+}
+
+
+// [[Rcpp::export]]
+vec signalPadding( vec &signal, int pad ) {
+   return cqtCalculationRcpp.padding(signal,pad);
+}
+
+
+
+
+// [[Rcpp::export]]
+cx_vec signalPaddingWhitenNormalise( cx_vec &signal, int pad ) {
+   cx_vec witenSignal = cqtCalculationRcpp.generateWaveWhitenNormalise(signal);
+   return cqtCalculationRcpp.padding(witenSignal,pad);
+}
+
+
+
+// [[Rcpp::export]]
+vec generateWaveWhiten( vec &signal ) {
+   return cqtCalculationRcpp.whiten(signal);
+}
+
+
+// [[Rcpp::export]]
+double getMaxWhitenSignal( vec &signal ) {
+   vec signalWhiten = cqtCalculationRcpp.whiten(signal);
+   return signalWhiten.max();
+}
+
+// [[Rcpp::export]]
+vec generateWhitenPad( vec &signal, int pad) {
+  vec signalWhiten =  cqtCalculationRcpp.whiten(signal);
+  return cqtCalculationRcpp.padding(signalWhiten,pad);
+}
+
+
+// [[Rcpp::export]]
+mat calcCqt( cx_vec &signal) {
+   cx_mat cqt = cqtCalculationRcpp.calcKernels();
+   cx_vec signalPadded = cqtCalculationRcpp.padding(signal);
+   cx_mat convMat = cqtCalculationRcpp.calcConv(cqt,signalPadded,cqtCalculationRcpp.hop_length);
+   return sqrt(pow(real(convMat),2) + pow(imag(convMat),2));
+}
+
+
+
+// [[Rcpp::export]]
+mat generateCQTConvWaveReal( vec &signal, int stride, int pad) {
+  cx_mat cqt = cqtCalculationRcpp.calcKernels();
+  mat cqtReal = real(cqt);
+
+  vec signalWhiten =  cqtCalculationRcpp.whiten(signal);
+  signalWhiten = signalWhiten / signalWhiten.max();
+
+  vec signalPadded = cqtCalculationRcpp.padding(signalWhiten,pad);
+
+  mat signalMat = cqtCalculationRcpp.slideSignal(signalPadded,stride,cqtReal.n_cols);
+  return cqtReal*signalMat;
+}
+
+
+// [[Rcpp::export]]
+mat generateCQTConvWaveImag( vec &signal, int stride, int pad) {
+  cx_mat cqt = cqtCalculationRcpp.calcKernels();
+  mat cqtImag = imag(cqt);
+
+  vec signalWhiten =  cqtCalculationRcpp.whiten(signal);
+  signalWhiten = signalWhiten / signalWhiten.max();
+
+  vec signalPadded = cqtCalculationRcpp.padding(signalWhiten,pad);
+  mat signalMat = cqtCalculationRcpp.slideSignal(signalPadded,stride,cqtImag.n_cols);
+  return cqtImag*signalMat;
+}
+
+
+// [[Rcpp::export]]
+mat generateCQTConvWave( vec &signal) {
+  cx_mat cqt = cqtCalculationRcpp.calcKernels();
+  mat cqtImag = imag(cqt);
+  mat cqtReal = real(cqt);
+
+  vec signalWhiten =  cqtCalculationRcpp.whiten(signal);
+  signalWhiten = signalWhiten / signalWhiten.max();
+
+  vec signalPadded = cqtCalculationRcpp.padding(signalWhiten);
+  mat signalMat = cqtCalculationRcpp.slideSignal(signalPadded,cqtCalculationRcpp.hop_length,cqtImag.n_cols);
+
+  mat cqtCalc = sqrt( pow(cqtReal*signalMat,2) + pow(cqtImag*signalMat,2) );
+  return cqtCalc.each_col() % sqrt(calcLengths());
+// return cqtCalc;
+}
+
+
+
+// [[Rcpp::export]]
+mat calcMatDistance( mat &a,mat &b) {
+  return sqrt(pow(a-b,2));
+}
+
+
+// [[Rcpp::export]]
+mat matMultVec(mat &matA, vec &vecB) {
+    mat result = matA.each_row() % vecB.t();
+    return  result;
+}
+
+
+
+
+// [[Rcpp::export]]
+vec calcMatDistanceVec( vec &a,vec &b) {
+  return sqrt(pow(a-b,2));
 }
 

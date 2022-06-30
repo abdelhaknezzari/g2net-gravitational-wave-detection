@@ -26,7 +26,8 @@ class CqtCalculationRcpp {
             cx_vec calcProduct2(cx_vec &v1,cx_vec &v2);
             cx_vec calcDiv(cx_vec &v1,vec &v2);
             vec energyOfSpectrum(cx_vec &signal);
-            vec whiten(cx_vec &signal);
+            cx_vec whiten(cx_vec &signal);
+            vec whiten(vec &signal);
             double calcQ();
             double calcNBins();
             vec calcFreqs();
@@ -37,8 +38,14 @@ class CqtCalculationRcpp {
             cx_mat calcKernelWindows();
             cx_mat calcKernelSignals() ;
             cx_vec padding( cx_vec &signal );
+            vec padding( vec &signal );
+            vec padding( vec &signal, int pad );
+            cx_vec padding( cx_vec &signal, int pad );
+            cx_mat slideSignal( cx_vec &signal , int stride, int numberOfRows );
             mat slideSignal( vec &signal , int stride, int numberOfRows );
-            mat calcConv(  mat &matr, vec &signal , int stride);
+            cx_mat calcConv(  cx_mat &matr, cx_vec &signal , int stride);
+            cx_vec generateWaveWhitenNormalise( cx_vec &signal );
+            cx_vec signalPaddingWhitenNormalise( cx_vec &signal, int pad );
         private:
           double min, max;
 };
@@ -48,7 +55,8 @@ vec CqtCalculationRcpp::hanningWindow(int N)
   if (N == 1) {
      return  {1};
   } else {
-     return 0.5-0.5*cos(2.0* datum::pi *  regspace<vec>(0,1, N -1 )  /N  );
+     return 0.5 -  0.5 * cos( 2.0 * linspace<vec>(0,datum::pi,N) );
+//     return 0.5-0.5*cos(2.0* datum::pi *  regspace<vec>(0,1, N -1 )  /N  );
   }
 }
 
@@ -56,12 +64,7 @@ vec CqtCalculationRcpp::hanningWindow(int N)
 cx_vec CqtCalculationRcpp::applyWindowToSignal(cx_vec &signal) {
      cx_vec wSignal( signal.size() ) ;
      vec window = hanningWindow( signal.size());
-
-    for (unsigned int i = 0 ; i < signal.size() ; i++) {
-       wSignal[i] = window[i] * signal[i] ;
-    }
-
-    return wSignal;
+    return  signal % window;
 }
 
 //
@@ -103,14 +106,6 @@ vec CqtCalculationRcpp::energyOfSpectrum(cx_vec &signal) {
     return sqrt(real(product));
 }
 
-
-vec CqtCalculationRcpp::whiten(cx_vec &signal) {
-     cx_vec spectrum     = signalProductWindowFft(signal);
-     cx_vec spectrumConj = conj(spectrum);
-     cx_vec product = calcProduct(spectrum,spectrumConj);
-     vec mag = sqrt(real(product));
-     return real(ifft(calcDiv(spectrum,mag))) * sqrt(signal.size()) * 0.5;
-}
 
 
 double CqtCalculationRcpp::calcQ() {
@@ -212,9 +207,91 @@ cx_vec CqtCalculationRcpp::padding( cx_vec &signal ) {
    cx_vec paddedSignal( padLength * 2 + signal.size() );
 
    paddedSignal.subvec(padLength , signalLength + padLength - 1 ) = signal;
-   paddedSignal.subvec(0 ,padLength - 1 ) = reverse(signal.subvec(0 ,padLength-1 ));
-   paddedSignal.subvec(signalLength + padLength ,signalLength + 2 * padLength -1 ) = reverse(signal.subvec(signalLength - padLength ,signalLength - 1));
+   paddedSignal.subvec(0 ,padLength - 1 ) = reverse(signal.subvec(1 ,padLength ));
+   paddedSignal.subvec(signalLength + padLength ,signalLength + 2 * padLength -1 ) = reverse(signal.subvec(signalLength - padLength - 1 ,signalLength - 2));
    return paddedSignal;
+}
+
+//---------------------------
+vec CqtCalculationRcpp::padding( vec &signal ) {
+
+   int padLength = calcFFTLen() / 2;
+   int signalLength = signal.size();
+   vec paddedSignal( padLength * 2 + signal.size() );
+
+   paddedSignal.subvec(padLength , signalLength + padLength - 1 ) = signal;
+   paddedSignal.subvec(0 ,padLength - 1 ) = reverse(signal.subvec(1 ,padLength ));
+   paddedSignal.subvec(signalLength + padLength ,signalLength + 2 * padLength -1 ) = reverse(signal.subvec(signalLength - padLength - 1 ,signalLength - 2));
+   return paddedSignal;
+}
+
+
+vec CqtCalculationRcpp::padding( vec &signal, int pad ) {
+   int signalLength = signal.size();
+   vec paddedSignal( pad * 2 + signal.size() );
+   paddedSignal.subvec(pad, signalLength + pad - 1 ) = signal;
+   paddedSignal.subvec(0 ,pad - 1 ) = reverse(signal.subvec(1 ,pad ));
+   paddedSignal.subvec(signalLength + pad ,signalLength + 2 * pad -1 ) = reverse(signal.subvec(signalLength - pad - 1 ,signalLength - 2));
+   return paddedSignal;
+}
+
+
+ cx_vec CqtCalculationRcpp::padding( cx_vec &signal, int pad ){
+     int signalLength = signal.size();
+     cx_vec paddedSignal( pad * 2 + signal.size() );
+     paddedSignal.subvec(pad, signalLength + pad - 1 ) = signal;
+     paddedSignal.subvec(0 ,pad - 1 ) = reverse(signal.subvec(1 ,pad ));
+     paddedSignal.subvec(signalLength + pad ,signalLength + 2 * pad -1 ) = reverse(signal.subvec(signalLength - pad - 1 ,signalLength - 2));
+     return paddedSignal;
+}
+
+
+
+
+
+//-----------------------
+
+
+cx_vec CqtCalculationRcpp::generateWaveWhitenNormalise( cx_vec &signal ) {
+   cx_vec signalFiltered = whiten(signal);
+
+   vec signalFilteredReal = (as<vec>)(wrap(real(signalFiltered)));
+   signalFilteredReal = signalFilteredReal / signalFilteredReal.max();
+
+   signalFiltered = (as<cx_vec>)(wrap(signalFilteredReal));
+   return signalFiltered;
+}
+
+vec CqtCalculationRcpp::whiten(vec &signal) {
+    vec window = hanningWindow( signal.size());
+    vec windowSignal = signal % window;
+    cx_vec spectrum = fft(windowSignal);
+    cx_vec spectrumConj = conj(spectrum);
+    vec product = real(spectrum % spectrumConj);
+    vec mag = sqrt(product);
+    return real(ifft(spectrum / mag)) * sqrt( signal.size() * 0.5) ;
+}
+
+
+cx_vec CqtCalculationRcpp::whiten(cx_vec &signal) {
+     vec window = hanningWindow( signal.size());
+     cx_vec windowSignal = signal % window;
+     cx_vec spectrum = fft(windowSignal);
+     cx_vec spectrumConj = conj(spectrum);
+     cx_vec product = calcProduct2(spectrum,spectrumConj);
+     vec mag = sqrt(real(product));
+     return (as<cx_vec>)(wrap(real(ifft(calcDiv(spectrum,mag))) * sqrt( signal.size() * 0.5) ) );
+}
+
+
+
+cx_mat CqtCalculationRcpp::slideSignal( cx_vec &signal , int stride, int numberOfRows ) {
+   int signalLength = signal.size();
+   cx_mat signalMatr( numberOfRows , (int)( (signalLength - numberOfRows ) /stride) +1   );
+    for( int k = 0 ; k  < (int)signalMatr.n_cols ; k++ ){
+        signalMatr.col(k) = signal.subvec( stride * k , stride * k + numberOfRows - 1  );
+    }
+   return signalMatr;
 }
 
 
@@ -228,10 +305,15 @@ mat CqtCalculationRcpp::slideSignal( vec &signal , int stride, int numberOfRows 
 }
 
 
-
-
-mat CqtCalculationRcpp::calcConv(  mat &matr, vec &signal , int stride) {
+cx_mat CqtCalculationRcpp::calcConv(cx_mat &matr, cx_vec &signal , int stride) {
    int ncol = matr.n_cols;
-   mat signalMatr = slideSignal(signal,stride,ncol);
+   cx_mat signalMatr = slideSignal(signal,stride,ncol);
    return matr * signalMatr;
 }
+
+
+cx_vec CqtCalculationRcpp::signalPaddingWhitenNormalise( cx_vec &signal, int pad ) {
+   cx_vec witenSignal = generateWaveWhitenNormalise(signal);
+   return padding(witenSignal,pad);
+}
+

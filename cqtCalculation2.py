@@ -66,60 +66,6 @@ def get_array(identifier):
 def getWaves(path):
     return np.load(path)
 
-def test1(index):
-    return int(index)
-
-
-
-def whiten5(path):
-    spectrum = whiten4(path)
-    return np.sqrt(np.real(spectrum))
-
-
-
-def whiten0(path,index):
-    waves = np.load(path)
-    return waves[int(index)]
-
-def whiten1(path):
-    waveform = whiten0(path,0)
-    return signal.hann(waveform.size)
-
-def whiten2(path):
-    waveform = whiten0(path,0)
-    window = whiten1(path)
-    return waveform * window
-
-def whiten3(path):
-    windowWave = whiten2(path)
-    return fft.fft(windowWave)
-
-def whiten4(path):
-    windowWaveSpec = whiten3(path)
-    return windowWaveSpec*np.conj(windowWaveSpec)
-
-def whiten5(path):
-    spectrum = whiten4(path)
-    return np.sqrt(np.real(spectrum))
-
-def whiten6(path):
-    waveform = whiten0(path,0)
-    window = signal.hann(waveform.size)
-    spectrum = fft.fft(waveform * window)
-    mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
-    return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)/2)
-
-def getWave(path):
-    waveform = whiten6(path)
-    return waveform / np.max(waveform)
-
-def get_cqt_spectrogram_of_data2(path):
-    cqt = CQT1992v2(sr=SAMPLING_FREQUENCY, hop_length=64, fmin=20, fmax=1024, bins_per_octave=12, norm=1, window='hann', center=True, pad_mode='reflect', trainable=False, output_format='Magnitude', verbose=False)
-    waveform = torch.from_numpy(getWave(path)).float()
-    cqt_image = cqt(waveform)
-    cqt_image = np.array(cqt_image)
-    cqt_image = np.transpose(cqt_image, (1,2,0))
-    return cqt_image
 
 def whiten(waveform):
     window = signal.hann(waveform.size)
@@ -258,9 +204,7 @@ class simpleCQT():
     def loadWave(self,path,index):
         waves = np.load(path)
         wave = waves[int(index)]
-        return wave/max(wave)
-
-
+        return wave
 
     def singnalProductWindow(self,path,index):
         waveform = self.loadWave(path,index)
@@ -310,26 +254,6 @@ class simpleCQT():
     def calcFreqs(self):
         return  self.fmin * 2.0 ** (np.r_[0:self.calcNBins()] / float(self.bins_per_octave))
 
-    def calcKernels(self):
-        lengths = self.calcLengths()
-        freqs = self.calcFreqs()
-        fftLen  = self.calcFFTLen()
-        nBins = self.calcNBins()
-        tempKernel = np.zeros( (int(nBins), int(fftLen )), dtype=np.complex64 )
-
-        for k in range(0, int(nBins)):
-            freq = freqs[k]
-            l = lengths[k]
-
-            if l % 2 == 1:
-                start = int(np.ceil(fftLen / 2.0 - l / 2.0)) - 1
-            else:
-                start = int(np.ceil(fftLen / 2.0 - l / 2.0))
-
-            window_dispatch = get_window(self.window, int(l), fftbins=True)
-            sig = window_dispatch * np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / self.SAMPLING_FREQUENCY ) / l
-            tempKernel[k, start : start + int(l)] = sig / np.linalg.norm(sig, self.norm)
-        return tempKernel
 
     def calcKernelWindows(self):
         lengths = self.calcLengths()
@@ -365,6 +289,27 @@ class simpleCQT():
         return tempKernel
 
 
+    def calcKernels(self):
+        lengths = self.calcLengths()
+        freqs = self.calcFreqs()
+        fftLen  = self.calcFFTLen()
+        nBins = self.calcNBins()
+        tempKernel = np.zeros( (int(nBins), int(fftLen )), dtype=np.complex64 )
+
+        for k in range(0, int(nBins)):
+            freq = freqs[k]
+            l = lengths[k]
+
+            if l % 2 == 1:
+                start = int(np.ceil(fftLen / 2.0 - l / 2.0)) - 1
+            else:
+                start = int(np.ceil(fftLen / 2.0 - l / 2.0))
+
+            window_dispatch = get_window(self.window, int(l), fftbins=True)
+            sig = window_dispatch * np.exp(np.r_[-l // 2 : l // 2] * 1j * 2 * np.pi * freq / self.SAMPLING_FREQUENCY ) / l
+            tempKernel[k, start : start + int(l)] = sig / np.linalg.norm(sig, self.norm)
+        return tempKernel
+
 
     def create_cqt_kernels(self):
         freqs = self.calcFreqs()
@@ -382,7 +327,14 @@ class simpleCQT():
         window = self.getHannWindow(int(waveform.size))
         spectrum = fft.fft(waveform * window)
         mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
-        return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)/2)
+        return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)*0.5)
+
+    def whiten(self,waveform):
+        window = self.getHannWindow(int(waveform.size))
+        spectrum = fft.fft(waveform * window)
+        mag = np.sqrt(np.real(spectrum*np.conj(spectrum)))
+        return np.real(fft.ifft(spectrum/mag)) * np.sqrt(len(waveform)*0.5)
+
 
     def get_cqt_spectrogram_of_data(self,data):
         waveform = torch.from_numpy(data / np.max(data)).float()
@@ -398,93 +350,169 @@ class simpleCQT():
         image1 = self.get_cqt_spectrogram_of_data(self.whiten(waves[1]))
         image2 = self.get_cqt_spectrogram_of_data(self.whiten(waves[2]))
         return np.concatenate( (image0.reshape(69*65 )  , image1.reshape(69*65 )  , image2.reshape(69*65 ) ))
+    # "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy"  %>% cqtCalc$generateCQTNpyFromFile() %>%
+    # array_reshape(c(3,69,65)) %>% .[1,,] %>% image()
 
-    def calcCQT1(self):
-        self.cqt_kernels = self.calcKernels()
-        return self.cqt_kernels.real, self.cqt_kernels.imag
-
-    def calcCQT12(self,matr,n):
-        return np.array(torch.tensor(matr).unsqueeze(int(n)))
-
-    def calcCQT13(self,path,n):
+    def generateCQTNpyFromFile(self,path,index):
         waves = np.load(path)
-        padding = nn.ReflectionPad1d(self.calcFFTLen() // 2)
-        data = waves[int(n)]
-        data = torch.from_numpy(data / np.max(data)).float()
-        return np.array(padding(self.broadcast_dim(data)))
+        image = self.get_cqt_spectrogram_of_data(self.whiten(waves[int(index)]))
+        return image.reshape(69*65 )
 
-    def calcCQT14(self,path,n):
-        return nn.ReflectionPad1d(int(n))
+    def signalPadding(self,waveform,pad):
+        waveform = torch.from_numpy(waveform)
+        padding = nn.ReflectionPad1d(int(pad))
+        return np.array(padding( self.broadcast_dim(waveform)))
 
-
-
-    def calcCQT15(self,path,n):
-        waves = np.load(path)
-        padding = nn.ReflectionPad1d(int(n))
-        return  np.array(padding( self.broadcast_dim(waves[0])))
-
-
-    def calcCQT16(self,path,n):
-        waves = np.load(path)
-        return   np.array(self.broadcast_dim(waves[0]))
-
-    def calcCQT17(self,path,n):
-        waves = np.load(path)
-        padding = nn.ReflectionPad1d(int(n))
-        return  np.array(padding( self.broadcast_dim(waves[0])))
-
-
-
-
-    def calcCQT2(self):
-        self.cqt_kernels = self.calcKernels()
+    def generateCQTConvWaveRe(self,path,index):
+        self.lenghts = self.calcLengths()
+        self.freqs = self.calcFreqs()
+        self.cqt_kernels  = self.calcKernels()
         self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
         self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
+        self.kernel_width  = self.calcFFTLen()
 
-        return np.array(self.cqt_kernels_real), np.array(self.cqt_kernels_imag)
+        waves = np.load(path)
 
+        waveWiten = self.whiten(waves[int(index)])
+        waveform = torch.from_numpy(waveWiten / np.max(waveWiten)).float()
 
-    def calcCQT3(self,x):
-        padding = nn.ReflectionPad1d(self.calcFFTLen()// 2)
-        return  padding( self.broadcast_dim(x))
-
-
-    def calcCQT4(self,x,len):
-        padding = nn.ReflectionPad1d(len)
-        return  padding( self.broadcast_dim(x))
-
-
-
-    def calcCQT61(self,mat,signal,strides):
-          return conv1d(self.broadcast_dim(torch.from_numpy(np.array(signal))), torch.tensor(mat).unsqueeze(1), stride=int(strides))
-# matrix(c(1,1,1,1,1,2,1,1,1,1,1,1),3,4) %>% cqtCalc$calcCQT61(c(2,7,3,2),1)
-# rep.int(1,10 * 10) %>% matrix(10,10) %>% cqtCalc$calcCQT61(rep.int(2,36),2)
-
-
-    def calcCQT6(self,path,waveNumber):
-        self.cqt_kernels, self.kernel_width, self.lenghts, self.freqs = self.create_cqt_kernels( )
-
-        self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
-        self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
-
+        #
         padding = nn.ReflectionPad1d(self.kernel_width // 2)
+        waveform = padding( self.broadcast_dim(waveform))
+        CQT_real = conv1d(waveform, self.cqt_kernels_real, stride=self.hop_length)
+        # CQT_imag = conv1d(waveform, self.cqt_kernels_imag, stride=self.hop_length)
+        # CQT = torch.sqrt(CQT_real.pow(2) + CQT_imag.pow(2))
+        # cqt_image = CQT * torch.sqrt( torch.tensor(self.lenghts).float().view(-1, 1))
+        # #
+        # cqt_image = np.array(cqt_image)
+        # cqt_image = np.transpose(cqt_image, (1,2,0))
+        return  np.array(CQT_real)
+
+    def generateWaveWhiten(self,path,index):
+        waves = np.load(path)
+        waveWiten = self.whiten(waves[int(index)])
+        return np.array(waveWiten)
+
+
+    def getMaxWhitenSignal(self,path,index):
+        waves = np.load(path)
+        waveWiten = self.whiten(waves[int(index)])
+        return np.max(waveWiten)
+
+
+    def generateWaveWhitenNormalise(self,path,index):
+        waves = np.load(path)
+        waveWiten = self.whiten(waves[int(index)])
+        waveWiten = waveWiten / np.max(waveWiten)
+        waveform = torch.from_numpy(waveWiten)
+        return np.array(waveform)
+
+    def generateWaveWhitenNormalisePad(self,path,index,pad):
+        waves = np.load(path)
+        waveWiten = self.whiten(waves[int(index)])
+        waveWiten = waveWiten / np.max(waveWiten)
+        waveform = torch.from_numpy(waveWiten)
+        padding = nn.ReflectionPad1d(int(pad))
+        return np.array(padding( self.broadcast_dim(waveform)))
+
+    def generateWavePadding(self,path,index):
+        self.kernel_width  = self.calcFFTLen()
+        waves = np.load(path)
+        waveform = torch.from_numpy(waves[int(index)])
+        padding = nn.ReflectionPad1d(self.kernel_width // 2)
+        waveform = padding( self.broadcast_dim(waveform))
+        return  np.array(waveform)
+    def check33(self,vec):
+        return np.array(torch.sqrt( torch.tensor(vec).float().view(-1, 1)))
+
+    def check34(self):
+        self.lenghts = self.calcLengths()
+        return np.array(torch.sqrt( torch.tensor(self.lenghts).float().view(-1, 1)))
+
+    def calcConv(self,cqt_kernels_real,waveform,hop_length):
+        return np.array(conv1d(self.broadcast_dim(torch.from_numpy(np.array(waveform))),torch.tensor(cqt_kernels_real).unsqueeze(1) , stride=int(hop_length)))
+
+
+    def generateCQTConvWaveReal(self,wave,stride,pad):
+        self.cqt_kernels  = self.calcKernels()
+        self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
+        waveWiten = self.whiten(wave)
+        waveWiten = waveWiten / np.max(waveWiten)
+        waveform = torch.from_numpy(waveWiten).float()
+        padding = nn.ReflectionPad1d(int(pad))
+        waveform = padding( self.broadcast_dim(waveform))
+        CQT_real = conv1d(waveform, self.cqt_kernels_real, stride=int(stride))
+        return  np.array(CQT_real)
+
+    def generateCQTConvWaveImag(self,wave,stride,pad):
+        self.cqt_kernels  = self.calcKernels()
+        self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
+        waveWiten = self.whiten(wave)
+        waveWiten = waveWiten / np.max(waveWiten)
+        waveform = torch.from_numpy(waveWiten).float()
+        padding = nn.ReflectionPad1d(int(pad))
+        waveform = padding( self.broadcast_dim(waveform))
+        CQT_real = conv1d(waveform, self.cqt_kernels_imag, stride=int(stride))
+        return  np.array(CQT_real)
+
+
+    def generateWhitenPad(self,wave,pad):
+        waveWiten = self.whiten(wave)
+        waveform = torch.from_numpy(waveWiten).float()
+        padding = nn.ReflectionPad1d(int(pad))
+        waveform = padding( self.broadcast_dim(waveform))
+        return  np.array(waveform)
+
+
+    def generateCQTConvWave(self,path,index):
+        self.lenghts = self.calcLengths()
+        self.freqs = self.calcFreqs()
+        self.cqt_kernels  = self.calcKernels()
+        self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
+        self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
+        self.kernel_width  = self.calcFFTLen()
 
         waves = np.load(path)
-        x = waves[int(waveNumber)]
-        x = padding( self.broadcast_dim(x))
-        CQT_real = conv1d(x, self.cqt_kernels_real, stride=self.hop_length)
-        CQT_imag = conv1d(x, self.cqt_kernels_imag, stride=self.hop_length)
-        CQT = torch.sqrt(CQT_real.pow(2) + CQT_imag.pow(2))
 
-        return CQT * torch.sqrt(self.lenghts.view(-1, 1))
+        waveWiten = self.whiten(waves[int(index)])
+        waveform = torch.from_numpy(waveWiten / np.max(waveWiten)).float()
+
+        #
+        padding = nn.ReflectionPad1d(self.kernel_width // 2)
+        waveform = padding( self.broadcast_dim(waveform))
+        CQT_real = conv1d(waveform, self.cqt_kernels_real, stride=self.hop_length)
+        CQT_imag = conv1d(waveform, self.cqt_kernels_imag, stride=self.hop_length)
+        CQT = torch.sqrt(CQT_real.pow(2) + CQT_imag.pow(2))
+        cqt_image = CQT * torch.sqrt( torch.tensor(self.lenghts).float().view(-1, 1))
+        # #
+        cqt_image = np.array(cqt_image)
+        cqt_image = np.transpose(cqt_image, (1,2,0))
+        return  np.array(cqt_image)
+
+    def matMultVec(self,mat,vec):
+        return mat * vec
+
+
+
+            # ,  self.cqt_kernels_imag , waveWiten , waveformOriginal, waveform
+# "../machineLearningData/gravitationalWaves/train/f/f/f/fff0ac62d3.npy"  %>% cqtCalc$generateCQTNpyFromFile(1) %>% array_reshape(c(69,65)) %>% image()
+
+
+
+
+# return List::create(
+#     Named("cqtReql") = cqt_kernels_real ,
+#                        Named("cqtImag") = cqt_kernels_imag,
+#                                           Named("waveWiten") = waveWiten,
+#                                                                Named("waveform") = waveform,
+#                                                                                    Named("signalPadded") = signalPadded ,
+#                                                                                                            Named("convMat") = convMat );
+
 
 
 
     def calcCQT(self,x):
-
-
         self.cqt_kernels, self.kernel_width, self.lenghts, self.freqs = self.create_cqt_kernels( )
-
         self.cqt_kernels_real = torch.tensor(self.cqt_kernels.real).unsqueeze(1)
         self.cqt_kernels_imag = torch.tensor(self.cqt_kernels.imag).unsqueeze(1)
 
@@ -503,8 +531,7 @@ def create_cqt_kernels(
         bins_per_octave=12,
         norm=1,
         window="hann",
-        fmax=None
-):
+        fmax=None):
     n_bins = np.ceil( bins_per_octave * np.log2(fmax / fmin))
     freqs = fmin * 2.0 ** (np.r_[0:n_bins] / float(bins_per_octave))
 
