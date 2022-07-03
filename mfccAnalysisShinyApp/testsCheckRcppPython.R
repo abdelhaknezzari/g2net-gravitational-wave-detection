@@ -125,7 +125,7 @@ test_that("Signal whiten padding is the same", {
 
 
 
-test_that("Signal whiten padding is the same", {
+test_that("Signal whiten padding normalize is the same", {
   expected =  wavePath %>% cqtCalc$generateWaveWhitenNormalisePad(1,80) %>% as.numeric()
   current = wavePath %>% cqtCalc$loadWave(1) %>% signalPaddingWhitenNormalise(80)  %>% Re() %>% as.numeric()
   expect_equal( expected ,current )

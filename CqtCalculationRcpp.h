@@ -283,8 +283,6 @@ cx_vec CqtCalculationRcpp::whiten(cx_vec &signal) {
      return (as<cx_vec>)(wrap(real(ifft(calcDiv(spectrum,mag))) * sqrt( signal.size() * 0.5) ) );
 }
 
-
-
 cx_mat CqtCalculationRcpp::slideSignal( cx_vec &signal , int stride, int numberOfRows ) {
    int signalLength = signal.size();
    cx_mat signalMatr( numberOfRows , (int)( (signalLength - numberOfRows ) /stride) +1   );
